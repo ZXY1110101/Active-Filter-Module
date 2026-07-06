@@ -1,0 +1,138 @@
+# ==========================================
+# Electronics project .gitignore
+# LCSC EDA / EasyEDA + Multisim + general EDA
+# ==========================================
+
+# ---------- OS / editor junk ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.autosave
+*.lock
+*.lck
+~$*
+*~
+
+# ---------- Logs / crash files ----------
+*.log
+*.dmp
+*.crash
+*.err
+
+# ---------- Compressed exports / archives ----------
+# Keep these out of Git if they are only generated backups.
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+
+# ---------- LCSC EDA / EasyEDA ----------
+# Local cache / temporary / autosave folders
+.cache/
+Cache/
+cache/
+temp/
+Temp/
+tmp/
+autosave/
+AutoSave/
+backup/
+Backup/
+
+# Generated manufacturing outputs
+Gerber/
+gerber/
+Gerbers/
+gerbers/
+Drill/
+drill/
+NC_Drill/
+PickPlace/
+pickplace/
+CPL/
+BOM_export/
+Manufacturing/
+manufacturing/
+Fabrication/
+fabrication/
+output/
+Output/
+outputs/
+Outputs/
+
+# Generated reports / previews
+*.html
+*.htm
+*.svg
+*.jpeg
+
+# Keep source/export files such as JSON, schematic, PCB, library files.
+# If you intentionally want PDFs/images in Git, force-add them:
+# git add -f path/to/file.pdf
+
+# ---------- Multisim ----------
+# Keep primary Multisim design files:
+#   *.ms14, *.ms13, *.ms12, etc.
+# Ignore backups, autosaves, generated simulation data and reports.
+*.ms??bak
+*.ms??~
+*.mpa
+*.mpt
+*.sav
+*.raw
+*.tr0
+*.ac0
+*.sw0
+*.op0
+*.noise
+*.measure
+*.dat
+*.csv
+*.tdms
+
+# Generated SPICE / netlist outputs
+*.cir
+*.net
+*.sp
+*.spi
+*.spice
+
+# Uncomment if you want to version exported netlists:
+# !*.cir
+# !*.net
+# !*.sp
+# !*.spi
+# !*.spice
+
+# ---------- Simulation output folders ----------
+simulation_results/
+SimulationResults/
+sim_results/
+results/
+Results/
+plots/
+Plots/
+waveforms/
+Waveforms/
+
+# ---------- Generic build / generated ----------
+build/
+Build/
+dist/
+generated/
+Generated/
+release/
+Release/
+
+# ---------- Keep documentation intentionally ----------
+# Recommended: store final docs in docs/ and force-include them.
+!docs/
+!docs/**
