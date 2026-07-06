@@ -82,8 +82,6 @@ Outputs/
 # Keep primary Multisim design files:
 #   *.ms14, *.ms13, *.ms12, etc.
 # Ignore backups, autosaves, generated simulation data and reports.
-*.ms??bak
-*.ms??~
 *.mpa
 *.mpt
 *.sav
