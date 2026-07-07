@@ -28,7 +28,7 @@ desktop.ini
 
 # ---------- Compressed exports / archives ----------
 # Keep these out of Git if they are only generated backups.
-*.zip
+
 *.rar
 *.7z
 *.tar
