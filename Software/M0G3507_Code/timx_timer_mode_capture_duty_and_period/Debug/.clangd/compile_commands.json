@@ -1,0 +1,12 @@
+[
+   {
+      "directory" : "C:/Users/Asus/workspace_ccstheia/timx_timer_mode_capture_duty_and_period/Debug",
+      "command"   : "clang++ -D__MSPM0G3507__ -D__USE_SYSCONFIG__ -I\"C:/Users/Asus/workspace_ccstheia/timx_timer_mode_capture_duty_and_period\" -I\"C:/Users/Asus/workspace_ccstheia/timx_timer_mode_capture_duty_and_period/Debug\" -I\"C:/TI/mspm0_sdk_2_10_00_04/source/third_party/CMSIS/Core/Include\" -I\"C:/TI/mspm0_sdk_2_10_00_04/source\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/armv7em-ti-none-eabihf/c++/v1\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/c++/v1\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/lib/clang/22/include\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/c\" -xc",
+      "file"      : "C:/Users/Asus/workspace_ccstheia/timx_timer_mode_capture_duty_and_period/timx_timer_mode_capture_duty_and_period.c"
+   },
+   {
+      "directory" : "C:/Users/Asus/workspace_ccstheia/timx_timer_mode_capture_duty_and_period/Debug",
+      "command"   : "clang++ -D__MSPM0G3507__ -D__USE_SYSCONFIG__ -I\"C:/Users/Asus/workspace_ccstheia/timx_timer_mode_capture_duty_and_period\" -I\"C:/Users/Asus/workspace_ccstheia/timx_timer_mode_capture_duty_and_period/Debug\" -I\"C:/TI/mspm0_sdk_2_10_00_04/source/third_party/CMSIS/Core/Include\" -I\"C:/TI/mspm0_sdk_2_10_00_04/source\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/armv7em-ti-none-eabihf/c++/v1\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/c++/v1\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/lib/clang/22/include\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/c\" -xc",
+      "file"      : "C:/Users/Asus/workspace_ccstheia/timx_timer_mode_capture_duty_and_period/Debug/ti_msp_dl_config.c"
+   }
+]
