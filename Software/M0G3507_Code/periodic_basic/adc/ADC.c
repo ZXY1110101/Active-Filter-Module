@@ -67,6 +67,16 @@ static float ADC_CalculateRobustVppCode(
 static void ADC_DMA_PrepareFrame(void);
 
 
+/* ================= 模块初始化 ================= */
+
+
+void ADC_Init(void)
+{
+    NVIC_ClearPendingIRQ(DMA_INT_IRQn);
+    NVIC_EnableIRQ(DMA_INT_IRQn);
+}
+
+
 
 
 /* ================= 排序函数 ================= */
@@ -389,6 +399,25 @@ void ADC_StartFrame(void)
 
 }
 
+
+
+
+
+/* ================= 完整帧采集 ================= */
+
+
+void ADC_CaptureFrame(void)
+{
+    ADC_StartFrame();
+
+    while (!gADCFrameReady)
+    {
+        __WFE();
+    }
+
+    DL_TimerG_stopCounter(TIMER_0_INST);
+    DL_ADC12_stopConversion(ADC12_0_INST);
+}
 
 
 

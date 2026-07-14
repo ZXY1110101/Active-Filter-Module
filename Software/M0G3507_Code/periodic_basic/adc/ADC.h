@@ -39,11 +39,23 @@ extern volatile bool gADCFrameReady;
 extern ADC_Result adcResult;
 
 
+/*
+ * 初始化ADC采样模块使用的DMA中断
+ */
+void ADC_Init(void);
+
+
 
 /*
  * ADC初始化采样
  */
 void ADC_StartFrame(void);
+
+
+/*
+ * 采集一帧ADC数据；函数会等待DMA完成并停止采样定时器
+ */
+void ADC_CaptureFrame(void);
 
 
 /*

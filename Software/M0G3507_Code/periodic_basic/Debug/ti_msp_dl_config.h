@@ -73,16 +73,68 @@ extern "C" {
 #define POWER_STARTUP_DELAY                                                (16)
 
 
-#define CPUCLK_FREQ                                                     32000000
+#define GPIO_HFXT_PORT                                                     GPIOA
+#define GPIO_HFXIN_PIN                                             DL_GPIO_PIN_5
+#define GPIO_HFXIN_IOMUX                                         (IOMUX_PINCM10)
+#define GPIO_HFXOUT_PIN                                            DL_GPIO_PIN_6
+#define GPIO_HFXOUT_IOMUX                                        (IOMUX_PINCM11)
+#define CPUCLK_FREQ                                                     80000000
+/* Defines for SYSPLL_ERR_01 Workaround */
+/* Represent 1.000 as 1000 */
+#define FLOAT_TO_INT_SCALE                                               (1000U)
+#define FCC_EXPECTED_RATIO                                                  2500
+#define FCC_UPPER_BOUND                       (FCC_EXPECTED_RATIO * (1 + 0.003))
+#define FCC_LOWER_BOUND                       (FCC_EXPECTED_RATIO * (1 - 0.003))
+
+bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
+
+
+/* Defines for CAPTURE_0 */
+#define CAPTURE_0_INST                                                  (TIMG12)
+#define CAPTURE_0_INST_IRQHandler                              TIMG12_IRQHandler
+#define CAPTURE_0_INST_INT_IRQN                                (TIMG12_INT_IRQn)
+#define CAPTURE_0_INST_LOAD_VALUE                                    (79999999U)
+/* GPIO defines for channel 0 */
+#define GPIO_CAPTURE_0_C0_PORT                                             GPIOB
+#define GPIO_CAPTURE_0_C0_PIN                                     DL_GPIO_PIN_13
+#define GPIO_CAPTURE_0_C0_IOMUX                                  (IOMUX_PINCM30)
+#define GPIO_CAPTURE_0_C0_IOMUX_FUNC                IOMUX_PINCM30_PF_TIMG12_CCP0
+
+
 
 
 
 /* Defines for TIMER_0 */
-#define TIMER_0_INST                                                     (TIMA0)
-#define TIMER_0_INST_IRQHandler                                 TIMA0_IRQHandler
-#define TIMER_0_INST_INT_IRQN                                   (TIMA0_INT_IRQn)
-#define TIMER_0_INST_LOAD_VALUE                                            (35U)
+#define TIMER_0_INST                                                     (TIMG7)
+#define TIMER_0_INST_IRQHandler                                 TIMG7_IRQHandler
+#define TIMER_0_INST_INT_IRQN                                   (TIMG7_INT_IRQn)
+#define TIMER_0_INST_LOAD_VALUE                                            (88U)
 #define TIMER_0_INST_PUB_0_CH                                                (1)
+/* Defines for TIMER_GATE */
+#define TIMER_GATE_INST                                                  (TIMA1)
+#define TIMER_GATE_INST_IRQHandler                              TIMA1_IRQHandler
+#define TIMER_GATE_INST_INT_IRQN                                (TIMA1_INT_IRQn)
+#define TIMER_GATE_INST_LOAD_VALUE                                      (31249U)
+
+
+
+/* Defines for UART_0 */
+#define UART_0_INST                                                        UART0
+#define UART_0_INST_FREQUENCY                                           40000000
+#define UART_0_INST_IRQHandler                                  UART0_IRQHandler
+#define UART_0_INST_INT_IRQN                                      UART0_INT_IRQn
+#define GPIO_UART_0_RX_PORT                                                GPIOA
+#define GPIO_UART_0_TX_PORT                                                GPIOA
+#define GPIO_UART_0_RX_PIN                                        DL_GPIO_PIN_11
+#define GPIO_UART_0_TX_PIN                                        DL_GPIO_PIN_10
+#define GPIO_UART_0_IOMUX_RX                                     (IOMUX_PINCM22)
+#define GPIO_UART_0_IOMUX_TX                                     (IOMUX_PINCM21)
+#define GPIO_UART_0_IOMUX_RX_FUNC                      IOMUX_PINCM22_PF_UART0_RX
+#define GPIO_UART_0_IOMUX_TX_FUNC                      IOMUX_PINCM21_PF_UART0_TX
+#define UART_0_BAUD_RATE                                                (115200)
+#define UART_0_IBRD_40_MHZ_115200_BAUD                                      (21)
+#define UART_0_FBRD_40_MHZ_115200_BAUD                                      (45)
+
 
 
 
@@ -107,15 +159,53 @@ extern "C" {
 #define ADC12_0_INST_DMA_TRIGGER                      (DMA_ADC0_EVT_GEN_BD_TRIG)
 
 
+/* Port definition for Pin Group GPIO_LEDS */
+#define GPIO_LEDS_PORT                                                   (GPIOB)
+
+/* Defines for USER_LED: GPIOB.14 with pinCMx 31 on package pin 2 */
+#define GPIO_LEDS_USER_LED_PIN                                  (DL_GPIO_PIN_14)
+#define GPIO_LEDS_USER_LED_IOMUX                                 (IOMUX_PINCM31)
+/* Port definition for Pin Group ADG704_EN */
+#define ADG704_EN_PORT                                                   (GPIOB)
+
+/* Defines for PIN_0: GPIOB.1 with pinCMx 13 on package pin 48 */
+#define ADG704_EN_PIN_0_PIN                                      (DL_GPIO_PIN_1)
+#define ADG704_EN_PIN_0_IOMUX                                    (IOMUX_PINCM13)
+/* Port definition for Pin Group ADG704_A0 */
+#define ADG704_A0_PORT                                                   (GPIOB)
+
+/* Defines for PIN_1: GPIOB.2 with pinCMx 15 on package pin 50 */
+#define ADG704_A0_PIN_1_PIN                                      (DL_GPIO_PIN_2)
+#define ADG704_A0_PIN_1_IOMUX                                    (IOMUX_PINCM15)
+/* Port definition for Pin Group ADG704_A1 */
+#define ADG704_A1_PORT                                                   (GPIOB)
+
+/* Defines for PIN_2: GPIOB.3 with pinCMx 16 on package pin 51 */
+#define ADG704_A1_PIN_2_PIN                                      (DL_GPIO_PIN_3)
+#define ADG704_A1_PIN_2_IOMUX                                    (IOMUX_PINCM16)
+/* Port definition for Pin Group GPIO_KEY */
+#define GPIO_KEY_PORT                                                    (GPIOB)
+
+/* Defines for PIN_3: GPIOB.0 with pinCMx 12 on package pin 47 */
+#define GPIO_KEY_PIN_3_PIN                                       (DL_GPIO_PIN_0)
+#define GPIO_KEY_PIN_3_IOMUX                                     (IOMUX_PINCM12)
+
+
 /* clang-format on */
 
 void SYSCFG_DL_init(void);
 void SYSCFG_DL_initPower(void);
 void SYSCFG_DL_GPIO_init(void);
 void SYSCFG_DL_SYSCTL_init(void);
+
+bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
+void SYSCFG_DL_CAPTURE_0_init(void);
 void SYSCFG_DL_TIMER_0_init(void);
+void SYSCFG_DL_TIMER_GATE_init(void);
+void SYSCFG_DL_UART_0_init(void);
 void SYSCFG_DL_ADC12_0_init(void);
 void SYSCFG_DL_DMA_init(void);
+
 
 bool SYSCFG_DL_saveConfiguration(void);
 bool SYSCFG_DL_restoreConfiguration(void);

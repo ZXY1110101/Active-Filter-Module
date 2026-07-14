@@ -33,57 +33,88 @@
 #include "ti_msp_dl_config.h"
 
 #include "ADC.h"
+#include "PGA.h"
+#include "UART.h"
+#include "frequency.h"
 
+#define MEASUREMENT_FRAMES_PER_REPORT (10U)
+#define MAIN_LOOP_DELAY_CYCLES        (1600000U)
 
+static void App_Init(void);
+static void App_RunMeasurementCycle(void);
+static void App_PrintBanner(void);
+static void App_PrintMeasurement(uint32_t frequencyHz);
 
 int main(void)
 {
+    App_Init();
 
+    while (1) {
+        App_RunMeasurementCycle();
+    }
+}
+
+/* 初始化各业务模块，并启动默认的低频测量模式。 */
+static void App_Init(void)
+{
     SYSCFG_DL_init();
 
+    UART_Init();
+    PGA_Init();
+    ADC_Init();
+    Frequency_Init();
 
-    NVIC_ClearPendingIRQ(DMA_INT_IRQn);
+    App_PrintBanner();
+    Frequency_StartAuto();
+}
 
-    NVIC_EnableIRQ(DMA_INT_IRQn);
+/* 执行一次完整的“按键处理 -> ADC 采样 -> 数据输出”任务。 */
+static void App_RunMeasurementCycle(void)
+{
+    static uint32_t frameCount = 0U;
 
+    Frequency_Task();
+    PGA_KeyScan();
 
-
-    ADC_StartFrame();
-
-
-
-    while(!gADCFrameReady)
-    {
-
-        __WFE();
-
-    }
-
-
-
-    DL_TimerG_stopCounter(
-        TIMER_0_INST);
-
-
-    DL_ADC12_stopConversion(
-        ADC12_0_INST);
-
-
-
+    ADC_CaptureFrame();
     ADC_AnalyzeSamples();
 
-
-
-    __BKPT(0);
-
-
-
-    while(1)
-    {
-
-        __WFI();
-
+    frameCount++;
+    if (frameCount >= MEASUREMENT_FRAMES_PER_REPORT) {
+        frameCount = 0U;
+        App_PrintMeasurement(Frequency_GetHz());
     }
 
+    delay_cycles(MAIN_LOOP_DELAY_CYCLES);
+}
 
+static void App_PrintBanner(void)
+{
+    UART_SendString("\r\n====================\r\n");
+    UART_SendString("MSPM0 Measurement System\r\n");
+    UART_SendString("Start\r\n");
+    UART_SendString("====================\r\n");
+}
+
+static void App_PrintMeasurement(uint32_t frequencyHz)
+{
+    UART_SendString("\r\n-------- DATA --------\r\n");
+
+    UART_SendString("GAIN: ");
+    UART_SendFloat((float)PGA_GetGain());
+    UART_SendString("\r\n");
+
+    UART_SendString("VPP: ");
+    UART_SendFloat(adcResult.vppV);
+    UART_SendString(" V\r\n");
+
+    UART_SendString("RMS: ");
+    UART_SendFloat(adcResult.rmsV);
+    UART_SendString(" V\r\n");
+
+    UART_SendString("FREQ: ");
+    UART_SendFloat((float)frequencyHz);
+    UART_SendString(" Hz\r\n");
+
+    UART_SendString("-----------------------\r\n");
 }
