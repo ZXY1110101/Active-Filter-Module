@@ -14,6 +14,9 @@ ORDERED_OBJS += \
 "./ti_msp_dl_config.o" \
 "./startup_mspm0g350x_ticlang.o" \
 "./adc/ADC.o" \
+"./app/display_ui.o" \
+"./app/ili9341_mspm0.o" \
+"./driver/DAC.o" \
 "./driver/PGA.o" \
 "./driver/UART.o" \
 "./driver/frequency.o" \
@@ -30,9 +33,11 @@ RMDIR := RMDIR /S/Q
 -include sources.mk
 -include subdir_vars.mk
 -include adc/subdir_vars.mk
+-include app/subdir_vars.mk
 -include driver/subdir_vars.mk
 -include subdir_rules.mk
 -include adc/subdir_rules.mk
+-include app/subdir_rules.mk
 -include driver/subdir_rules.mk
 -include objects.mk
 
@@ -144,8 +149,8 @@ periodic_basic.out: $(OBJS) $(GEN_CMDS)
 # Other Targets
 clean:
 	-$(RM) $(GEN_MISC_FILES__QUOTED)$(GEN_FILES__QUOTED)$(EXE_OUTPUTS__QUOTED)
-	-$(RM) "main.o" "ti_msp_dl_config.o" "startup_mspm0g350x_ticlang.o" "adc\ADC.o" "driver\PGA.o" "driver\UART.o" "driver\frequency.o" 
-	-$(RM) "main.d" "ti_msp_dl_config.d" "startup_mspm0g350x_ticlang.d" "adc\ADC.d" "driver\PGA.d" "driver\UART.d" "driver\frequency.d" 
+	-$(RM) "main.o" "ti_msp_dl_config.o" "startup_mspm0g350x_ticlang.o" "adc\ADC.o" "app\display_ui.o" "app\ili9341_mspm0.o" "driver\DAC.o" "driver\PGA.o" "driver\UART.o" "driver\frequency.o" 
+	-$(RM) "main.d" "ti_msp_dl_config.d" "startup_mspm0g350x_ticlang.d" "adc\ADC.d" "app\display_ui.d" "app\ili9341_mspm0.d" "driver\DAC.d" "driver\PGA.d" "driver\UART.d" "driver\frequency.d" 
 	-@echo ' '
 
 .PHONY: all clean dependents

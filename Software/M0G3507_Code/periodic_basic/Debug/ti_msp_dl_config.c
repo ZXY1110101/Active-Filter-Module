@@ -42,6 +42,7 @@
 
 DL_TimerG_backupConfig gTIMER_0Backup;
 DL_TimerA_backupConfig gTIMER_GATEBackup;
+DL_SPI_backupConfig gLCD_SPIBackup;
 
 /*
  *  ======== SYSCFG_DL_init ========
@@ -57,13 +58,16 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_TIMER_0_init();
     SYSCFG_DL_TIMER_GATE_init();
     SYSCFG_DL_UART_0_init();
+    SYSCFG_DL_LCD_SPI_init();
     SYSCFG_DL_ADC12_0_init();
     SYSCFG_DL_DMA_init();
+    SYSCFG_DL_DAC12_init();
     /* Ensure backup structures have no valid state */
 
 	gTIMER_0Backup.backupRdy 	= false;
 	gTIMER_GATEBackup.backupRdy 	= false;
 
+	gLCD_SPIBackup.backupRdy 	= false;
 
 }
 /*
@@ -76,6 +80,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_saveConfiguration(void)
 
 	retStatus &= DL_TimerG_saveConfiguration(TIMER_0_INST, &gTIMER_0Backup);
 	retStatus &= DL_TimerA_saveConfiguration(TIMER_GATE_INST, &gTIMER_GATEBackup);
+	retStatus &= DL_SPI_saveConfiguration(LCD_SPI_INST, &gLCD_SPIBackup);
 
     return retStatus;
 }
@@ -87,6 +92,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_restoreConfiguration(void)
 
 	retStatus &= DL_TimerG_restoreConfiguration(TIMER_0_INST, &gTIMER_0Backup, false);
 	retStatus &= DL_TimerA_restoreConfiguration(TIMER_GATE_INST, &gTIMER_GATEBackup, false);
+	retStatus &= DL_SPI_restoreConfiguration(LCD_SPI_INST, &gLCD_SPIBackup);
 
     return retStatus;
 }
@@ -99,8 +105,10 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_TimerG_reset(TIMER_0_INST);
     DL_TimerA_reset(TIMER_GATE_INST);
     DL_UART_Main_reset(UART_0_INST);
+    DL_SPI_reset(LCD_SPI_INST);
     DL_ADC12_reset(ADC12_0_INST);
 
+    DL_DAC12_reset(DAC0);
 
     DL_GPIO_enablePower(GPIOA);
     DL_GPIO_enablePower(GPIOB);
@@ -108,8 +116,10 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_TimerG_enablePower(TIMER_0_INST);
     DL_TimerA_enablePower(TIMER_GATE_INST);
     DL_UART_Main_enablePower(UART_0_INST);
+    DL_SPI_enablePower(LCD_SPI_INST);
     DL_ADC12_enablePower(ADC12_0_INST);
 
+    DL_DAC12_enablePower(DAC0);
     delay_cycles(POWER_STARTUP_DELAY);
 }
 
@@ -126,6 +136,13 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
     DL_GPIO_initPeripheralInputFunction(
         GPIO_UART_0_IOMUX_RX, GPIO_UART_0_IOMUX_RX_FUNC);
 
+    DL_GPIO_initPeripheralOutputFunction(
+        GPIO_LCD_SPI_IOMUX_SCLK, GPIO_LCD_SPI_IOMUX_SCLK_FUNC);
+    DL_GPIO_initPeripheralOutputFunction(
+        GPIO_LCD_SPI_IOMUX_PICO, GPIO_LCD_SPI_IOMUX_PICO_FUNC);
+    DL_GPIO_initPeripheralInputFunction(
+        GPIO_LCD_SPI_IOMUX_POCI, GPIO_LCD_SPI_IOMUX_POCI_FUNC);
+
     DL_GPIO_initDigitalOutput(GPIO_LEDS_USER_LED_IOMUX);
 
     DL_GPIO_initDigitalOutput(ADG704_EN_PIN_0_IOMUX);
@@ -138,14 +155,30 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_NONE,
 		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
 
+    DL_GPIO_initDigitalOutput(LCD_GPIO_CS_IOMUX);
+
+    DL_GPIO_initDigitalOutput(LCD_GPIO_DC_IOMUX);
+
+    DL_GPIO_initDigitalOutput(LCD_GPIO_RST_IOMUX);
+
+    DL_GPIO_initDigitalOutput(LCD_GPIO_BL_IOMUX);
+
+    DL_GPIO_clearPins(GPIOA, LCD_GPIO_CS_PIN |
+		LCD_GPIO_DC_PIN);
+    DL_GPIO_enableOutput(GPIOA, LCD_GPIO_CS_PIN |
+		LCD_GPIO_DC_PIN);
     DL_GPIO_clearPins(GPIOB, GPIO_LEDS_USER_LED_PIN |
 		ADG704_EN_PIN_0_PIN |
 		ADG704_A0_PIN_1_PIN |
-		ADG704_A1_PIN_2_PIN);
+		ADG704_A1_PIN_2_PIN |
+		LCD_GPIO_RST_PIN |
+		LCD_GPIO_BL_PIN);
     DL_GPIO_enableOutput(GPIOB, GPIO_LEDS_USER_LED_PIN |
 		ADG704_EN_PIN_0_PIN |
 		ADG704_A0_PIN_1_PIN |
-		ADG704_A1_PIN_2_PIN);
+		ADG704_A1_PIN_2_PIN |
+		LCD_GPIO_RST_PIN |
+		LCD_GPIO_BL_PIN);
 
 }
 
@@ -256,6 +289,9 @@ SYSCONFIG_WEAK void SYSCFG_DL_SYSCTL_init(void)
         while ((DL_SYSCTL_getClockStatus() & SYSCTL_CLKSTATUS_SYSPLLGOOD_MASK) != DL_SYSCTL_CLK_STATUS_SYSPLL_GOOD){}
     }
     DL_SYSCTL_setULPCLKDivider(DL_SYSCTL_ULPCLK_DIV_2);
+    DL_SYSCTL_setHFCLKDividerForMFPCLK(DL_SYSCTL_HFCLK_MFPCLK_DIVIDER_10);
+    DL_SYSCTL_enableMFPCLK();
+	DL_SYSCTL_setMFPCLKSource(DL_SYSCTL_MFPCLK_SOURCE_HFCLK);
     DL_SYSCTL_setMCLKSource(SYSOSC, HSCLK, DL_SYSCTL_HSCLK_SOURCE_SYSPLL);
 
 }
@@ -413,6 +449,38 @@ SYSCONFIG_WEAK void SYSCFG_DL_UART_0_init(void)
     DL_UART_Main_enable(UART_0_INST);
 }
 
+static const DL_SPI_Config gLCD_SPI_config = {
+    .mode        = DL_SPI_MODE_CONTROLLER,
+    .frameFormat = DL_SPI_FRAME_FORMAT_MOTO3_POL1_PHA0,
+    .parity      = DL_SPI_PARITY_NONE,
+    .dataSize    = DL_SPI_DATA_SIZE_8,
+    .bitOrder    = DL_SPI_BIT_ORDER_MSB_FIRST,
+};
+
+static const DL_SPI_ClockConfig gLCD_SPI_clockConfig = {
+    .clockSel    = DL_SPI_CLOCK_BUSCLK,
+    .divideRatio = DL_SPI_CLOCK_DIVIDE_RATIO_1
+};
+
+SYSCONFIG_WEAK void SYSCFG_DL_LCD_SPI_init(void) {
+    DL_SPI_setClockConfig(LCD_SPI_INST, (DL_SPI_ClockConfig *) &gLCD_SPI_clockConfig);
+
+    DL_SPI_init(LCD_SPI_INST, (DL_SPI_Config *) &gLCD_SPI_config);
+
+    /* Configure Controller mode */
+    /*
+     * Set the bit rate clock divider to generate the serial output clock
+     *     outputBitRate = (spiInputClock) / ((1 + SCR) * 2)
+     *     8000000 = (80000000)/((1 + 4) * 2)
+     */
+    DL_SPI_setBitRateSerialClockDivider(LCD_SPI_INST, 4);
+    /* Set RX and TX FIFO threshold levels */
+    DL_SPI_setFIFOThreshold(LCD_SPI_INST, DL_SPI_RX_FIFO_LEVEL_1_2_FULL, DL_SPI_TX_FIFO_LEVEL_1_2_EMPTY);
+
+    /* Enable module */
+    DL_SPI_enable(LCD_SPI_INST);
+}
+
 /* ADC12_0 Initialization */
 static const DL_ADC12_ClockConfig gADC12_0ClockConfig = {
     .clockSel       = DL_ADC12_CLOCK_ULPCLK,
@@ -458,4 +526,23 @@ SYSCONFIG_WEAK void SYSCFG_DL_DMA_init(void){
     SYSCFG_DL_DMA_CH0_init();
 }
 
+
+static const DL_DAC12_Config gDAC12Config = {
+    .outputEnable              = DL_DAC12_OUTPUT_ENABLED,
+    .resolution                = DL_DAC12_RESOLUTION_12BIT,
+    .representation            = DL_DAC12_REPRESENTATION_BINARY,
+    .voltageReferenceSource    = DL_DAC12_VREF_SOURCE_VDDA_VSSA,
+    .amplifierSetting          = DL_DAC12_AMP_ON,
+    .fifoEnable                = DL_DAC12_FIFO_DISABLED,
+    .fifoTriggerSource         = DL_DAC12_FIFO_TRIGGER_SAMPLETIMER,
+    .dmaTriggerEnable          = DL_DAC12_DMA_TRIGGER_DISABLED,
+    .dmaTriggerThreshold       = DL_DAC12_FIFO_THRESHOLD_ONE_QTR_EMPTY,
+    .sampleTimeGeneratorEnable = DL_DAC12_SAMPLETIMER_DISABLE,
+    .sampleRate                = DL_DAC12_SAMPLES_PER_SECOND_500,
+};
+SYSCONFIG_WEAK void SYSCFG_DL_DAC12_init(void)
+{
+    DL_DAC12_init(DAC0, (DL_DAC12_Config *) &gDAC12Config);
+    DL_DAC12_enable(DAC0);
+}
 

@@ -120,5 +120,6 @@ GEN_OPTS__QUOTED :=
 SUBDIRS := \
 . \
 adc \
+app \
 driver \
 

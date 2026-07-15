@@ -138,6 +138,25 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 
 
 
+/* Defines for LCD_SPI */
+#define LCD_SPI_INST                                                       SPI1
+#define LCD_SPI_INST_IRQHandler                                 SPI1_IRQHandler
+#define LCD_SPI_INST_INT_IRQN                                     SPI1_INT_IRQn
+#define GPIO_LCD_SPI_PICO_PORT                                            GPIOA
+#define GPIO_LCD_SPI_PICO_PIN                                    DL_GPIO_PIN_18
+#define GPIO_LCD_SPI_IOMUX_PICO                                 (IOMUX_PINCM40)
+#define GPIO_LCD_SPI_IOMUX_PICO_FUNC                 IOMUX_PINCM40_PF_SPI1_PICO
+#define GPIO_LCD_SPI_POCI_PORT                                            GPIOA
+#define GPIO_LCD_SPI_POCI_PIN                                    DL_GPIO_PIN_16
+#define GPIO_LCD_SPI_IOMUX_POCI                                 (IOMUX_PINCM38)
+#define GPIO_LCD_SPI_IOMUX_POCI_FUNC                 IOMUX_PINCM38_PF_SPI1_POCI
+/* GPIO configuration for LCD_SPI */
+#define GPIO_LCD_SPI_SCLK_PORT                                            GPIOA
+#define GPIO_LCD_SPI_SCLK_PIN                                    DL_GPIO_PIN_17
+#define GPIO_LCD_SPI_IOMUX_SCLK                                 (IOMUX_PINCM39)
+#define GPIO_LCD_SPI_IOMUX_SCLK_FUNC                 IOMUX_PINCM39_PF_SPI1_SCLK
+
+
 
 /* Defines for ADC12_0 */
 #define ADC12_0_INST                                                        ADC0
@@ -189,6 +208,32 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for PIN_3: GPIOB.0 with pinCMx 12 on package pin 47 */
 #define GPIO_KEY_PIN_3_PIN                                       (DL_GPIO_PIN_0)
 #define GPIO_KEY_PIN_3_IOMUX                                     (IOMUX_PINCM12)
+/* Defines for CS: GPIOA.12 with pinCMx 34 on package pin 5 */
+#define LCD_GPIO_CS_PORT                                                 (GPIOA)
+#define LCD_GPIO_CS_PIN                                         (DL_GPIO_PIN_12)
+#define LCD_GPIO_CS_IOMUX                                        (IOMUX_PINCM34)
+/* Defines for DC: GPIOA.13 with pinCMx 35 on package pin 6 */
+#define LCD_GPIO_DC_PORT                                                 (GPIOA)
+#define LCD_GPIO_DC_PIN                                         (DL_GPIO_PIN_13)
+#define LCD_GPIO_DC_IOMUX                                        (IOMUX_PINCM35)
+/* Defines for RST: GPIOB.15 with pinCMx 32 on package pin 3 */
+#define LCD_GPIO_RST_PORT                                                (GPIOB)
+#define LCD_GPIO_RST_PIN                                        (DL_GPIO_PIN_15)
+#define LCD_GPIO_RST_IOMUX                                       (IOMUX_PINCM32)
+/* Defines for BL: GPIOB.16 with pinCMx 33 on package pin 4 */
+#define LCD_GPIO_BL_PORT                                                 (GPIOB)
+#define LCD_GPIO_BL_PIN                                         (DL_GPIO_PIN_16)
+#define LCD_GPIO_BL_IOMUX                                        (IOMUX_PINCM33)
+
+
+
+/* Defines for DAC12 */
+#define DAC12_IRQHandler                                         DAC0_IRQHandler
+#define DAC12_INT_IRQN                                           (DAC0_INT_IRQn)
+#define GPIO_DAC12_OUT_PORT                                                GPIOA
+#define GPIO_DAC12_OUT_PIN                                        DL_GPIO_PIN_15
+#define GPIO_DAC12_IOMUX_OUT                                     (IOMUX_PINCM37)
+#define GPIO_DAC12_IOMUX_OUT_FUNC                   IOMUX_PINCM37_PF_UNCONNECTED
 
 
 /* clang-format on */
@@ -203,9 +248,11 @@ void SYSCFG_DL_CAPTURE_0_init(void);
 void SYSCFG_DL_TIMER_0_init(void);
 void SYSCFG_DL_TIMER_GATE_init(void);
 void SYSCFG_DL_UART_0_init(void);
+void SYSCFG_DL_LCD_SPI_init(void);
 void SYSCFG_DL_ADC12_0_init(void);
 void SYSCFG_DL_DMA_init(void);
 
+void SYSCFG_DL_DAC12_init(void);
 
 bool SYSCFG_DL_saveConfiguration(void);
 bool SYSCFG_DL_restoreConfiguration(void);

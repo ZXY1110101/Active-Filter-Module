@@ -1,74 +1,32 @@
 #include "ADC.h"
+
 #include "ti_msp_dl_config.h"
 
 #include <math.h>
-#include <stdlib.h>
+#include <stddef.h>
 
+#define ADC_CODE_MASK          (0x0FFFU)
+#define ADC_FULL_SCALE_CODE_U  (4095U)
+#define ADC_FULL_SCALE_CODE_F  (4095.0f)
+#define ADC_CLIP_MARGIN_CODE   (4U)
 
-/* ================= 参数 ================= */
+/* 默认跟随 SysConfig 中 ADC MEM0 的参考电压配置。 */
+#ifndef ADC_REFERENCE_V
+#define ADC_REFERENCE_V ((float)ADC12_0_ADCMEM_0_REF_VOLTAGE_V)
+#endif
 
-
-#define ADC_REFERENCE_V       (3.3f)
-
-#define ADC_FULL_SCALE_CODE   (4095.0f)
-
-
-/* 稳健峰值平均数量 */
-#define PEAK_AVG_COUNT        (16U)
-
-
-
-/* ================= 全局变量 ================= */
-
-
-/*
- * ADC采样缓冲区
- */
 uint16_t gADCSamples[ADC_SAMPLE_SIZE];
-
-
-
-/*
- * 排序缓存
- */
-static uint16_t gSortBuffer[ADC_SAMPLE_SIZE];
-
-
-
-/*
- * DMA完成标志
- */
 volatile bool gADCFrameReady = false;
-
-
-
-/*
- * ADC最终结果
- */
 ADC_Result adcResult;
 
+/* 保存 3 点中值滤波结果，原始 DMA 波形保持不变。 */
+static uint16_t gFilteredSamples[ADC_SAMPLE_SIZE];
 
-
-/* ================= 内部函数声明 ================= */
-
-
-static int CompareUint16(
-        const void *a,
-        const void *b);
-
-
-
-static float ADC_CalculateRobustVppCode(
-        const uint16_t *samples,
-        uint32_t count);
-
-
-
+static uint16_t ADC_Median3(uint16_t a, uint16_t b, uint16_t c);
+static float ADC_RefineExtremum(uint32_t index, uint32_t count);
+static void ADC_FindAccurateExtrema(
+    const uint16_t *samples, uint32_t count, float *minCode, float *maxCode);
 static void ADC_DMA_PrepareFrame(void);
-
-
-/* ================= 模块初始化 ================= */
-
 
 void ADC_Init(void)
 {
@@ -76,342 +34,197 @@ void ADC_Init(void)
     NVIC_EnableIRQ(DMA_INT_IRQn);
 }
 
-
-
-
-/* ================= 排序函数 ================= */
-
-
-static int CompareUint16(
-        const void *a,
-        const void *b)
+static uint16_t ADC_Median3(uint16_t a, uint16_t b, uint16_t c)
 {
-
-    uint16_t va =
-            *(const uint16_t *)a;
-
-
-    uint16_t vb =
-            *(const uint16_t *)b;
-
-
-
-    if(va < vb)
-    {
-        return -1;
+    if (a > b) {
+        uint16_t t = a;
+        a = b;
+        b = t;
     }
-
-
-    if(va > vb)
-    {
-        return 1;
+    if (b > c) {
+        uint16_t t = b;
+        b = c;
+        c = t;
     }
-
-
-    return 0;
-
+    if (a > b) {
+        b = a;
+    }
+    return b;
 }
 
-
-
-
-/* ================= 稳健Vpp计算 ================= */
-
-
-static float ADC_CalculateRobustVppCode(
-        const uint16_t *samples,
-        uint32_t count)
+/*
+ * 在离散极值左右各取一点做二次曲线插值，估计采样点之间的峰值。
+ * 对平顶波、边界点或曲率过小的情况直接返回离散极值。
+ */
+static float ADC_RefineExtremum(uint32_t index, uint32_t count)
 {
+    float ym;
+    float y0;
+    float yp;
+    float curvature;
+    float offset;
+    float refined;
 
-
-    if(samples == NULL ||
-       count < 2 * PEAK_AVG_COUNT)
-    {
-        return 0.0f;
+    if ((index == 0U) || ((index + 1U) >= count)) {
+        return (float)gFilteredSamples[index];
     }
 
+    ym = (float)gFilteredSamples[index - 1U];
+    y0 = (float)gFilteredSamples[index];
+    yp = (float)gFilteredSamples[index + 1U];
+    curvature = ym - (2.0f * y0) + yp;
 
-
-    /*
-     * 复制数据
-     */
-    for(uint32_t i=0;i<count;i++)
-    {
-
-        gSortBuffer[i]
-                = samples[i] & 0x0FFFU;
-
+    if (fabsf(curvature) < 1.0f) {
+        return y0;
     }
 
-
-
-    /*
-     * 排序
-     */
-    qsort(
-        gSortBuffer,
-        count,
-        sizeof(uint16_t),
-        CompareUint16);
-
-
-
-    uint32_t lowSum = 0;
-
-    uint32_t highSum = 0;
-
-
-
-    for(uint32_t i=0;i<PEAK_AVG_COUNT;i++)
-    {
-
-        lowSum += gSortBuffer[i];
-
-
-        highSum +=
-            gSortBuffer[count-1-i];
-
+    offset = (ym - yp) / (2.0f * curvature);
+    if ((offset < -0.5f) || (offset > 0.5f)) {
+        return y0;
     }
 
-
-
-    float lowCode =
-            (float)lowSum /
-            PEAK_AVG_COUNT;
-
-
-
-    float highCode =
-            (float)highSum /
-            PEAK_AVG_COUNT;
-
-
-
-    return highCode-lowCode;
-
+    refined = y0 - (((yp - ym) * (yp - ym)) / (8.0f * curvature));
+    if (refined < 0.0f) {
+        refined = 0.0f;
+    } else if (refined > ADC_FULL_SCALE_CODE_F) {
+        refined = ADC_FULL_SCALE_CODE_F;
+    }
+    return refined;
 }
 
+static void ADC_FindAccurateExtrema(
+    const uint16_t *samples, uint32_t count, float *minCode, float *maxCode)
+{
+    uint16_t minimum;
+    uint16_t maximum;
+    uint32_t minIndex = 0U;
+    uint32_t maxIndex = 0U;
+    uint32_t i;
 
+    if ((samples == NULL) || (minCode == NULL) || (maxCode == NULL) ||
+        (count == 0U) || (count > ADC_SAMPLE_SIZE)) {
+        if (minCode != NULL) {
+            *minCode = 0.0f;
+        }
+        if (maxCode != NULL) {
+            *maxCode = 0.0f;
+        }
+        return;
+    }
 
+    gFilteredSamples[0] = samples[0] & ADC_CODE_MASK;
+    if (count == 1U) {
+        *minCode = (float)gFilteredSamples[0];
+        *maxCode = (float)gFilteredSamples[0];
+        return;
+    }
 
-/* ================= 数据分析 ================= */
+    for (i = 1U; i + 1U < count; i++) {
+        gFilteredSamples[i] = ADC_Median3(
+            samples[i - 1U] & ADC_CODE_MASK,
+            samples[i] & ADC_CODE_MASK,
+            samples[i + 1U] & ADC_CODE_MASK);
+    }
+    gFilteredSamples[count - 1U] = samples[count - 1U] & ADC_CODE_MASK;
 
+    /*
+     * 忽略帧首尾点寻找极值，避免无法进行插值；3 点中值滤波会消除
+     * 单采样点毛刺，但不会像“顶部/底部 16 点平均”那样压低幅值。
+     */
+    minimum = gFilteredSamples[1U];
+    maximum = gFilteredSamples[1U];
+    minIndex = 1U;
+    maxIndex = 1U;
+    for (i = 2U; i + 1U < count; i++) {
+        if (gFilteredSamples[i] < minimum) {
+            minimum = gFilteredSamples[i];
+            minIndex = i;
+        }
+        if (gFilteredSamples[i] > maximum) {
+            maximum = gFilteredSamples[i];
+            maxIndex = i;
+        }
+    }
+
+    *minCode = ADC_RefineExtremum(minIndex, count);
+    *maxCode = ADC_RefineExtremum(maxIndex, count);
+    if (*maxCode < *minCode) {
+        *maxCode = *minCode;
+    }
+}
 
 void ADC_AnalyzeSamples(void)
 {
+    uint32_t sumCode = 0U;
+    float squareSum = 0.0f;
+    float averageCode;
+    float minCode;
+    float maxCode;
+    float centerCode;
+    uint32_t i;
 
-    uint32_t sumCode=0;
+    for (i = 0U; i < ADC_SAMPLE_SIZE; i++) {
+        sumCode += gADCSamples[i] & ADC_CODE_MASK;
+    }
+    averageCode = (float)sumCode / (float)ADC_SAMPLE_SIZE;
 
-
-
-    /*
-     * 平均值
-     */
-    for(uint32_t i=0;
-        i<ADC_SAMPLE_SIZE;
-        i++)
-    {
-
-        sumCode +=
-            gADCSamples[i]&0x0FFFU;
-
+    for (i = 0U; i < ADC_SAMPLE_SIZE; i++) {
+        float acCode = (float)(gADCSamples[i] & ADC_CODE_MASK) - averageCode;
+        squareSum += acCode * acCode;
     }
 
-
-
-    float averageCode =
-            (float)sumCode /
-            ADC_SAMPLE_SIZE;
-
-
-
-    /*
-     * RMS
-     */
-
-    float squareSum=0;
-
-
-
-    for(uint32_t i=0;
-        i<ADC_SAMPLE_SIZE;
-        i++)
-    {
-
-
-        float acCode =
-            (float)(gADCSamples[i]&0x0FFFU)
-            - averageCode;
-
-
-
-        squareSum +=
-            acCode*acCode;
-
-    }
-
-
-
-    float rmsCode =
-        sqrtf(
-            squareSum /
-            ADC_SAMPLE_SIZE);
-
-
-
-    /*
-     * Vpp
-     */
-
-    float vppCode =
-        ADC_CalculateRobustVppCode(
-            gADCSamples,
-            ADC_SAMPLE_SIZE);
-
-
-
-    /*
-     * 转换电压
-     */
+    ADC_FindAccurateExtrema(
+        gADCSamples, ADC_SAMPLE_SIZE, &minCode, &maxCode);
+    centerCode = (minCode + maxCode) * 0.5f;
 
     adcResult.averageV =
-        averageCode *
-        ADC_REFERENCE_V /
-        ADC_FULL_SCALE_CODE;
-
-
-
-    adcResult.vppV =
-        vppCode *
-        ADC_REFERENCE_V /
-        ADC_FULL_SCALE_CODE;
-
-
-
-    adcResult.amplitudeV =
-        adcResult.vppV/2.0f;
-
-
-
+        averageCode * ADC_REFERENCE_V / ADC_FULL_SCALE_CODE_F;
+    adcResult.minV = minCode * ADC_REFERENCE_V / ADC_FULL_SCALE_CODE_F;
+    adcResult.maxV = maxCode * ADC_REFERENCE_V / ADC_FULL_SCALE_CODE_F;
+    adcResult.centerV = centerCode * ADC_REFERENCE_V / ADC_FULL_SCALE_CODE_F;
+    adcResult.vppV = adcResult.maxV - adcResult.minV;
+    adcResult.amplitudeV = adcResult.vppV * 0.5f;
     adcResult.rmsV =
-        rmsCode *
-        ADC_REFERENCE_V /
-        ADC_FULL_SCALE_CODE;
+        sqrtf(squareSum / (float)ADC_SAMPLE_SIZE) *
+        ADC_REFERENCE_V / ADC_FULL_SCALE_CODE_F;
 
-
-
+    adcResult.minCode = (uint16_t)(minCode + 0.5f);
+    adcResult.maxCode = (uint16_t)(maxCode + 0.5f);
+    adcResult.centerCode = (uint16_t)(centerCode + 0.5f);
+    adcResult.clipped =
+        (adcResult.minCode <= ADC_CLIP_MARGIN_CODE) ||
+        (adcResult.maxCode >= (ADC_FULL_SCALE_CODE_U - ADC_CLIP_MARGIN_CODE));
 }
-
-
-
-
-
-/* ================= DMA准备 ================= */
-
 
 static void ADC_DMA_PrepareFrame(void)
 {
+    gADCFrameReady = false;
 
-
-    gADCFrameReady=false;
-
-
-
-    DL_DMA_disableChannel(
-        DMA,
-        DMA_CH0_CHAN_ID);
-
-
-
-    /*
-     * ADC MEM0作为DMA源
-     */
-
+    DL_DMA_disableChannel(DMA, DMA_CH0_CHAN_ID);
     DL_DMA_setSrcAddr(
         DMA,
         DMA_CH0_CHAN_ID,
-        DL_ADC12_getMemResultAddress(
-            ADC12_0_INST,
-            DL_ADC12_MEM_IDX_0));
-
-
-
-    /*
-     * buffer作为目标
-     */
-
+        DL_ADC12_getMemResultAddress(ADC12_0_INST, DL_ADC12_MEM_IDX_0));
     DL_DMA_setDestAddr(
         DMA,
         DMA_CH0_CHAN_ID,
         (uint32_t)&gADCSamples[0]);
-
-
-
-    /*
-     * 1024次传输
-     */
-
-    DL_DMA_setTransferSize(
-        DMA,
-        DMA_CH0_CHAN_ID,
-        ADC_SAMPLE_SIZE);
-
-
-
-    DL_DMA_enableChannel(
-        DMA,
-        DMA_CH0_CHAN_ID);
-
-
+    DL_DMA_setTransferSize(DMA, DMA_CH0_CHAN_ID, ADC_SAMPLE_SIZE);
+    DL_DMA_enableChannel(DMA, DMA_CH0_CHAN_ID);
 }
-
-
-
-
-/* ================= 启动采样 ================= */
-
 
 void ADC_StartFrame(void)
 {
-
-
     ADC_DMA_PrepareFrame();
-
-
-
-    /*
-     * ADC等待Timer触发
-     */
-
-    DL_ADC12_startConversion(
-        ADC12_0_INST);
-
-
-
-    /*
-     * 开启采样Timer
-     */
-
-    DL_TimerG_startCounter(
-        TIMER_0_INST);
-
-
-
+    DL_ADC12_startConversion(ADC12_0_INST);
+    DL_TimerG_startCounter(TIMER_0_INST);
 }
-
-
-
-
-
-/* ================= 完整帧采集 ================= */
-
 
 void ADC_CaptureFrame(void)
 {
     ADC_StartFrame();
 
-    while (!gADCFrameReady)
-    {
+    while (!gADCFrameReady) {
         __WFE();
     }
 
@@ -419,34 +232,14 @@ void ADC_CaptureFrame(void)
     DL_ADC12_stopConversion(ADC12_0_INST);
 }
 
-
-
-
-/* ================= DMA中断 ================= */
-
-
 void DMA_IRQHandler(void)
 {
-
-    switch(
-        DL_DMA_getPendingInterrupt(DMA))
-    {
-
-
+    switch (DL_DMA_getPendingInterrupt(DMA)) {
         case DL_DMA_EVENT_IIDX_DMACH0:
-
-
-            gADCFrameReady=true;
-
-
+            gADCFrameReady = true;
             break;
-
-
 
         default:
-
             break;
-
     }
-
 }

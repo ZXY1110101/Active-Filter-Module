@@ -13,12 +13,16 @@ const ADC12    = scripting.addModule("/ti/driverlib/ADC12", {}, false);
 const ADC121   = ADC12.addInstance();
 const CAPTURE  = scripting.addModule("/ti/driverlib/CAPTURE", {}, false);
 const CAPTURE1 = CAPTURE.addInstance();
+const DAC12    = scripting.addModule("/ti/driverlib/DAC12");
 const GPIO     = scripting.addModule("/ti/driverlib/GPIO", {}, false);
 const GPIO1    = GPIO.addInstance();
 const GPIO2    = GPIO.addInstance();
 const GPIO3    = GPIO.addInstance();
 const GPIO4    = GPIO.addInstance();
 const GPIO5    = GPIO.addInstance();
+const GPIO6    = GPIO.addInstance();
+const SPI      = scripting.addModule("/ti/driverlib/SPI", {}, false);
+const SPI1     = SPI.addInstance();
 const SYSCTL   = scripting.addModule("/ti/driverlib/SYSCTL");
 const TIMER    = scripting.addModule("/ti/driverlib/TIMER", {}, false);
 const TIMER1   = TIMER.addInstance();
@@ -29,8 +33,14 @@ const UART1    = UART.addInstance();
 /**
  * Write custom configuration values to the imported modules.
  */
+const divider2       = system.clockTree["HFCLK4MFPCLKDIV"];
+divider2.divideValue = 10;
+
 const divider9       = system.clockTree["UDIV"];
 divider9.divideValue = 2;
+
+const gate8  = system.clockTree["MFPCLKGATE"];
+gate8.enable = true;
 
 const multiplier2         = system.clockTree["PLL_QDIV"];
 multiplier2.multiplyValue = 5;
@@ -40,6 +50,9 @@ mux4.inputSelect = "EXHFMUX_XTAL";
 
 const mux8       = system.clockTree["HSCLKMUX"];
 mux8.inputSelect = "HSCLKMUX_SYSPLL0";
+
+const mux10       = system.clockTree["MFPCLKMUX"];
+mux10.inputSelect = "MFPCLKMUX_HFCLK";
 
 const pinFunction4     = system.clockTree["HFXT"];
 pinFunction4.inputFreq = 40;
@@ -69,12 +82,16 @@ const Board = scripting.addModule("/ti/driverlib/Board", {}, false);
 
 CAPTURE1.$name                      = "CAPTURE_0";
 CAPTURE1.captMode                   = "COMBINED";
-CAPTURE1.timerClkPrescale           = 1;
 CAPTURE1.timerPeriod                = "1 s";
 CAPTURE1.interrupts                 = ["CC1_DN","ZERO"];
 CAPTURE1.peripheral.$assign         = "TIMG12";
 CAPTURE1.peripheral.ccp0Pin.$assign = "PB13";
 CAPTURE1.ccp0PinConfig.$name        = "ti_driverlib_gpio_GPIOPinGeneric3";
+
+DAC12.dacOutputPinEn     = true;
+DAC12.dacAmplifier       = "ON";
+DAC12.peripheral.$assign = "DAC0";
+DAC12.OutPinConfig.$name = "ti_driverlib_gpio_GPIOPinGeneric7";
 
 GPIO1.$name                         = "GPIO_LEDS";
 GPIO1.port                          = "PORTB";
@@ -102,8 +119,38 @@ GPIO5.associatedPins[0].$name       = "PIN_3";
 GPIO5.associatedPins[0].assignedPin = "0";
 GPIO5.associatedPins[0].direction   = "INPUT";
 
+GPIO6.$name                          = "LCD_GPIO";
+GPIO6.associatedPins.create(4);
+GPIO6.associatedPins[0].$name        = "CS";
+GPIO6.associatedPins[1].$name        = "DC";
+GPIO6.associatedPins[2].$name        = "RST";
+GPIO6.associatedPins[2].assignedPort = "PORTB";
+GPIO6.associatedPins[2].assignedPin  = "15";
+GPIO6.associatedPins[3].$name        = "BL";
+GPIO6.associatedPins[3].assignedPort = "PORTB";
+GPIO6.associatedPins[3].assignedPin  = "16";
+
+SPI1.$name                              = "LCD_SPI";
+SPI1.frameFormat                        = "MOTO3";
+SPI1.polarity                           = "1";
+SPI1.sclkPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric4";
+SPI1.sclkPinConfig.direction            = scripting.forceWrite("OUTPUT");
+SPI1.sclkPinConfig.onlyInternalResistor = scripting.forceWrite(false);
+SPI1.sclkPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
+SPI1.mosiPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric5";
+SPI1.mosiPinConfig.direction            = scripting.forceWrite("OUTPUT");
+SPI1.mosiPinConfig.hideOutputInversion  = scripting.forceWrite(false);
+SPI1.mosiPinConfig.onlyInternalResistor = scripting.forceWrite(false);
+SPI1.mosiPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
+SPI1.misoPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric6";
+SPI1.misoPinConfig.onlyInternalResistor = scripting.forceWrite(false);
+SPI1.misoPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
+SPI1.peripheral.$assign                 = "SPI1";
+
 SYSCTL.forceDefaultClkConfig = true;
 SYSCTL.clockTreeEn           = true;
+SYSCTL.MFPCLKEn              = true;
+SYSCTL.MFPCLKSource          = "HFCLK";
 
 TIMER1.$name                       = "TIMER_0";
 TIMER1.timerClkPrescale            = 9;
@@ -142,9 +189,17 @@ ADC121.DMA_CHANNEL.peripheral.$suggestSolution     = "DMA_CH0";
 Board.peripheral.$suggestSolution                  = "DEBUGSS";
 Board.peripheral.swclkPin.$suggestSolution         = "PA20";
 Board.peripheral.swdioPin.$suggestSolution         = "PA19";
+DAC12.peripheral.OutPin.$suggestSolution           = "PA15";
 GPIO1.associatedPins[0].pin.$suggestSolution       = "PB14";
 GPIO2.associatedPins[0].pin.$suggestSolution       = "PB1";
 GPIO3.associatedPins[0].pin.$suggestSolution       = "PB2";
 GPIO4.associatedPins[0].pin.$suggestSolution       = "PB3";
 GPIO5.associatedPins[0].pin.$suggestSolution       = "PB0";
+GPIO6.associatedPins[0].pin.$suggestSolution       = "PA12";
+GPIO6.associatedPins[1].pin.$suggestSolution       = "PA13";
+GPIO6.associatedPins[2].pin.$suggestSolution       = "PB15";
+GPIO6.associatedPins[3].pin.$suggestSolution       = "PB16";
+SPI1.peripheral.sclkPin.$suggestSolution           = "PA17";
+SPI1.peripheral.mosiPin.$suggestSolution           = "PA18";
+SPI1.peripheral.misoPin.$suggestSolution           = "PA16";
 UART1.peripheral.$suggestSolution                  = "UART0";

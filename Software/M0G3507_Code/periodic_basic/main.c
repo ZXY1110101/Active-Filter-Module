@@ -33,17 +33,25 @@
 #include "ti_msp_dl_config.h"
 
 #include "ADC.h"
+#include "DAC.h"
 #include "PGA.h"
 #include "UART.h"
+#include "display_ui.h"
 #include "frequency.h"
+#include "ili9341_mspm0.h"
 
-#define MEASUREMENT_FRAMES_PER_REPORT (10U)
+#define MEASUREMENT_FRAMES_PER_REPORT (25U)
 #define MAIN_LOOP_DELAY_CYCLES        (1600000U)
+#define ADC_FULL_SCALE_CODE           (4095U)
+#define DAC_MIN_VALID_VPP_CODE        (32U)
 
 static void App_Init(void);
 static void App_RunMeasurementCycle(void);
 static void App_PrintBanner(void);
 static void App_PrintMeasurement(uint32_t frequencyHz);
+static void App_UpdateDisplay(uint32_t frequencyHz);
+
+static int16_t gDisplaySamples[ADC_SAMPLE_SIZE];
 
 int main(void)
 {
@@ -62,7 +70,12 @@ static void App_Init(void)
     UART_Init();
     PGA_Init();
     ADC_Init();
+    DAC_Init();
     Frequency_Init();
+
+    LCD_Init();
+    LCD_Clear(LCD_BLACK);
+    DisplayUI_DrawStaticFrame();
 
     App_PrintBanner();
     Frequency_StartAuto();
@@ -79,10 +92,23 @@ static void App_RunMeasurementCycle(void)
     ADC_CaptureFrame();
     ADC_AnalyzeSamples();
 
+    /*
+     * TLV3507 基准使用跨帧中值、死区和分级低通跟踪。
+     * 削顶或 VPP 小于约 26mV 时冻结基准，避免把噪声当成有效波形。
+     */
+    DAC_TrackReference(
+        adcResult.centerCode,
+        (!adcResult.clipped) &&
+            ((uint16_t)(adcResult.maxCode - adcResult.minCode) >=
+             DAC_MIN_VALID_VPP_CODE));
+
     frameCount++;
     if (frameCount >= MEASUREMENT_FRAMES_PER_REPORT) {
+        uint32_t frequencyHz = Frequency_GetHz();
+
         frameCount = 0U;
-        App_PrintMeasurement(Frequency_GetHz());
+        App_PrintMeasurement(frequencyHz);
+        App_UpdateDisplay(frequencyHz);
     }
 
     delay_cycles(MAIN_LOOP_DELAY_CYCLES);
@@ -104,6 +130,14 @@ static void App_PrintMeasurement(uint32_t frequencyHz)
     UART_SendFloat((float)PGA_GetGain());
     UART_SendString("\r\n");
 
+    UART_SendString("MAX: ");
+    UART_SendFloat(adcResult.maxV);
+    UART_SendString(" V\r\n");
+
+    UART_SendString("MIN: ");
+    UART_SendFloat(adcResult.minV);
+    UART_SendString(" V\r\n");
+
     UART_SendString("VPP: ");
     UART_SendFloat(adcResult.vppV);
     UART_SendString(" V\r\n");
@@ -112,9 +146,58 @@ static void App_PrintMeasurement(uint32_t frequencyHz)
     UART_SendFloat(adcResult.rmsV);
     UART_SendString(" V\r\n");
 
+    UART_SendString("TLV_REF: ");
+    UART_SendFloat(
+        ((float)DAC_GetCode() *
+         (float)ADC12_0_ADCMEM_0_REF_VOLTAGE_V) /
+        (float)ADC_FULL_SCALE_CODE);
+    UART_SendString(" V\r\n");
+
     UART_SendString("FREQ: ");
     UART_SendFloat((float)frequencyHz);
     UART_SendString(" Hz\r\n");
 
+    if (adcResult.clipped) {
+        UART_SendString("WARNING: ADC CLIPPED\r\n");
+    }
+
     UART_SendString("-----------------------\r\n");
+}
+
+static void App_UpdateDisplay(uint32_t frequencyHz)
+{
+    DisplayUI_Measurements measurements;
+    uint32_t frequencyCentiHz;
+    float dutyPercent;
+    uint32_t i;
+
+    for (i = 0U; i < ADC_SAMPLE_SIZE; i++) {
+        gDisplaySamples[i] =
+            (int16_t)(gADCSamples[i] & ADC_FULL_SCALE_CODE);
+    }
+
+    if (frequencyHz > (UINT32_MAX / 100U)) {
+        frequencyCentiHz = UINT32_MAX;
+    } else {
+        frequencyCentiHz = frequencyHz * 100U;
+    }
+
+    dutyPercent = Frequency_GetDuty();
+    if (dutyPercent < 0.0f) {
+        dutyPercent = 0.0f;
+    } else if (dutyPercent > 100.0f) {
+        dutyPercent = 100.0f;
+    }
+
+    measurements.vpp_mv = (int32_t)(adcResult.vppV * 1000.0f + 0.5f);
+    measurements.vmax_mv = (int32_t)(adcResult.maxV * 1000.0f + 0.5f);
+    measurements.vmin_mv = (int32_t)(adcResult.minV * 1000.0f + 0.5f);
+    measurements.vavg_mv =
+        (int32_t)(adcResult.averageV * 1000.0f + 0.5f);
+    measurements.freq_cHz = frequencyCentiHz;
+    measurements.duty_x100 = (uint16_t)(dutyPercent * 100.0f + 0.5f);
+
+    DisplayUI_DrawWaveformI16(gDisplaySamples, ADC_SAMPLE_SIZE, 0,
+                              ADC_FULL_SCALE_CODE);
+    DisplayUI_UpdateMeasurements(&measurements);
 }
