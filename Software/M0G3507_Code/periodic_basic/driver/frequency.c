@@ -6,7 +6,6 @@
 
 /* TIMG12在当前时钟树下使用80 MHz BUSCLK。 */
 #define PERIOD_TIMER_CLOCK_HZ       (80000000U)
-#define PERIOD_AVERAGE_PERIODS      (4U)
 
 /* 10个100 ms窗口组成1秒闸门，最终分辨率为1 Hz。 */
 #define GATE_AVERAGE_WINDOWS        (10U)
@@ -40,9 +39,6 @@ static const DL_TimerG_CompareConfig gEdgeCounterConfig = {
 static uint32_t gCaptureLoadValue = 0U;
 
 static volatile bool gPeriodSynced = false;
-static volatile uint32_t gPeriodCount = 0U;
-static volatile uint64_t gPeriodTicksSum = 0U;
-static volatile uint64_t gHighTicksSum = 0U;
 
 static volatile uint32_t gEdgePrevious = EDGE_COUNTER_RELOAD;
 static volatile uint64_t gPulseAccumulator = 0U;
@@ -80,9 +76,6 @@ static void Frequency_StopHardware(void)
 static void Frequency_ResetPeriodState(void)
 {
     gPeriodSynced = false;
-    gPeriodCount = 0U;
-    gPeriodTicksSum = 0U;
-    gHighTicksSum = 0U;
     gPeriodUs = 0.0f;
     gDutyPercent = 0.0f;
 }
@@ -292,44 +285,32 @@ void CAPTURE_0_INST_IRQHandler(void)
                 highTicks = gCaptureLoadValue - captureHigh;
                 frequencyLastPeriodTicks = periodTicks;
 
-                if ((periodTicks > 0U) && (highTicks <= periodTicks))
+                if (periodTicks > 0U)
                 {
-                    gPeriodTicksSum += periodTicks;
-                    gHighTicksSum += highTicks;
-                    gPeriodCount++;
+                    frequencyHz =
+                        (uint32_t)((uint64_t)PERIOD_TIMER_CLOCK_HZ /
+                            periodTicks);
+                    gPeriodUs =
+                        ((float)periodTicks * 1000000.0f) /
+                        (float)PERIOD_TIMER_CLOCK_HZ;
 
-                    if (gPeriodCount >= PERIOD_AVERAGE_PERIODS)
+                    if (highTicks <= periodTicks)
                     {
-                        uint32_t averagePeriodTicks =
-                            (uint32_t)(gPeriodTicksSum /
-                                PERIOD_AVERAGE_PERIODS);
-                        uint32_t averageHighTicks =
-                            (uint32_t)(gHighTicksSum /
-                                PERIOD_AVERAGE_PERIODS);
-
-                        frequencyHz =
-                            (uint32_t)(((uint64_t)PERIOD_TIMER_CLOCK_HZ *
-                                PERIOD_AVERAGE_PERIODS) /
-                                gPeriodTicksSum);
-                        gPeriodUs =
-                            ((float)averagePeriodTicks * 1000000.0f) /
-                            (float)PERIOD_TIMER_CLOCK_HZ;
                         gDutyPercent =
-                            ((float)averageHighTicks * 100.0f) /
-                            (float)averagePeriodTicks;
+                            ((float)highTicks * 100.0f) /
+                            (float)periodTicks;
+                    }
+                    else
+                    {
+                        gDutyPercent = 0.0f;
+                    }
 
-                        gPeriodCount = 0U;
-                        gPeriodTicksSum = 0U;
-                        gHighTicksSum = 0U;
-
-                        if ((gCurrentMode == FREQUENCY_MODE_AUTO) &&
-                            (frequencyHz >= AUTO_PERIOD_TO_GATE_HZ))
-                        {
-                            gRequestedMeasurement =
-                                ACTIVE_MEASUREMENT_GATE;
-                            DL_TimerG_stopCounter(CAPTURE_0_INST);
-                            NVIC_DisableIRQ(CAPTURE_0_INST_INT_IRQN);
-                        }
+                    if ((gCurrentMode == FREQUENCY_MODE_AUTO) &&
+                        (frequencyHz >= AUTO_PERIOD_TO_GATE_HZ))
+                    {
+                        gRequestedMeasurement = ACTIVE_MEASUREMENT_GATE;
+                        DL_TimerG_stopCounter(CAPTURE_0_INST);
+                        NVIC_DisableIRQ(CAPTURE_0_INST_INT_IRQN);
                     }
                 }
             }
@@ -339,10 +320,9 @@ void CAPTURE_0_INST_IRQHandler(void)
 
         case DL_TIMER_IIDX_ZERO:
             gPeriodSynced = false;
-            gPeriodCount = 0U;
-            gPeriodTicksSum = 0U;
-            gHighTicksSum = 0U;
             frequencyHz = 0U;
+            gPeriodUs = 0.0f;
+            gDutyPercent = 0.0f;
             break;
 
         default:
