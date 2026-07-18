@@ -28,9 +28,12 @@ static const uint8_t *font5x7(char c)
     static const uint8_t e[5]     = {0x7F, 0x49, 0x49, 0x49, 0x41};
     static const uint8_t f[5]     = {0x7F, 0x09, 0x09, 0x09, 0x01};
     static const uint8_t h[5]     = {0x7F, 0x08, 0x08, 0x08, 0x7F};
+    static const uint8_t i[5]     = {0x00, 0x41, 0x7F, 0x41, 0x00};
     static const uint8_t k[5]     = {0x7F, 0x08, 0x14, 0x22, 0x41};
     static const uint8_t m[5]     = {0x7F, 0x02, 0x0C, 0x02, 0x7F};
+    static const uint8_t n[5]     = {0x7F, 0x04, 0x08, 0x10, 0x7F};
     static const uint8_t p[5]     = {0x7F, 0x09, 0x09, 0x09, 0x06};
+    static const uint8_t q[5]     = {0x3E, 0x41, 0x51, 0x21, 0x5E};
     static const uint8_t r[5]     = {0x7F, 0x09, 0x19, 0x29, 0x46};
     static const uint8_t s[5]     = {0x46, 0x49, 0x49, 0x49, 0x31};
     static const uint8_t t[5]     = {0x01, 0x01, 0x7F, 0x01, 0x01};
@@ -64,9 +67,12 @@ static const uint8_t *font5x7(char c)
     case 'E': return e;
     case 'F': return f;
     case 'H': return h;
+    case 'I': return i;
     case 'K': return k;
     case 'M': return m;
+    case 'N': return n;
     case 'P': return p;
+    case 'Q': return q;
     case 'R': return r;
     case 'S': return s;
     case 'T': return t;
@@ -314,11 +320,13 @@ void DisplayUI_DrawStaticFrame(void)
                        DISPLAY_UI_CYAN, DISPLAY_UI_BLACK, 1U);
     DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 32U, "VPP",
                        DISPLAY_UI_GRAY, DISPLAY_UI_BLACK, 1U);
-    DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 72U, "FREQ",
+    DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 64U, "AMP",
                        DISPLAY_UI_GRAY, DISPLAY_UI_BLACK, 1U);
-    DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 112U, "DUTY",
+    DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 96U, "FREQ",
                        DISPLAY_UI_GRAY, DISPLAY_UI_BLACK, 1U);
-    DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 152U, "VMAX",
+    DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 128U, "DUTY",
+                       DISPLAY_UI_GRAY, DISPLAY_UI_BLACK, 1U);
+    DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 160U, "VMAX",
                        DISPLAY_UI_GRAY, DISPLAY_UI_BLACK, 1U);
     DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 192U, "VMIN",
                        DISPLAY_UI_GRAY, DISPLAY_UI_BLACK, 1U);
@@ -337,9 +345,13 @@ void DisplayUI_UpdateMeasurements(const DisplayUI_Measurements *m)
     pad_value_text(buf, sizeof(buf), 12U);
     DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 44U, buf,
                        DISPLAY_UI_YELLOW, DISPLAY_UI_BLACK, 1U);
+    make_voltage(buf, sizeof(buf), m->amplitude_mv);
+    pad_value_text(buf, sizeof(buf), 12U);
+    DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 76U, buf,
+                       DISPLAY_UI_MAGENTA, DISPLAY_UI_BLACK, 1U);
     make_frequency(buf, sizeof(buf), m->freq_cHz);
     pad_value_text(buf, sizeof(buf), 12U);
-    DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 84U, buf,
+    DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 108U, buf,
                        DISPLAY_UI_GREEN, DISPLAY_UI_BLACK, 1U);
     p = buf;
     end = buf + sizeof(buf) - 1U;
@@ -347,11 +359,11 @@ void DisplayUI_UpdateMeasurements(const DisplayUI_Measurements *m)
     append_char(&p, end, '%');
     *p = '\0';
     pad_value_text(buf, sizeof(buf), 12U);
-    DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 124U, buf,
+    DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 140U, buf,
                        DISPLAY_UI_ORANGE, DISPLAY_UI_BLACK, 1U);
     make_voltage(buf, sizeof(buf), m->vmax_mv);
     pad_value_text(buf, sizeof(buf), 12U);
-    DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 164U, buf,
+    DisplayUI_DrawText(PANEL_X + 6U, PANEL_Y + 172U, buf,
                        DISPLAY_UI_WHITE, DISPLAY_UI_BLACK, 1U);
     make_voltage(buf, sizeof(buf), m->vmin_mv);
     pad_value_text(buf, sizeof(buf), 12U);

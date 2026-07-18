@@ -129,7 +129,7 @@ all: $(OBJS) $(GEN_CMDS)
 # Tool invocations
 adc12_max_freq_dma.out: $(OBJS) $(GEN_CMDS)
 	@echo 'Arm Linker - building target: "$@"'
-	"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/bin/tiarmclang.exe" @"device.opt"  -march=thumbv6m -mcpu=cortex-m0plus -mfloat-abi=soft -mlittle-endian -mthumb -O2 -gdwarf-3 -Wall -Wl,-m"adc12_max_freq_dma.map" -Wl,-i"C:/TI/mspm0_sdk_2_10_00_04/source" -Wl,-i"C:/Users/Asus/workspace_ccstheia/adc12_max_freq_dma" -Wl,-i"C:/Users/Asus/workspace_ccstheia/adc12_max_freq_dma/Debug/syscfg" -Wl,-i"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/lib" -Wl,--diag_wrap=off -Wl,--display_error_number -Wl,--warn_sections -Wl,--xml_link_info="adc12_max_freq_dma_linkInfo.xml" -Wl,--rom_model -o "adc12_max_freq_dma.out" $(ORDERED_OBJS)
+	"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/bin/tiarmclang.exe" @"device.opt"  -march=thumbv6m -mcpu=cortex-m0plus -mfloat-abi=soft -mlittle-endian -mthumb -O2 -gdwarf-3 -Wall -Wl,-m"adc12_max_freq_dma.map" -Wl,-i"C:/TI/mspm0_sdk_2_10_00_04/source" -Wl,-i"D:/Active-Filter-Module/Software/M0G3507_Code/adc12_max_freq_dma" -Wl,-i"D:/Active-Filter-Module/Software/M0G3507_Code/adc12_max_freq_dma/Debug/syscfg" -Wl,-i"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/lib" -Wl,--diag_wrap=off -Wl,--display_error_number -Wl,--warn_sections -Wl,--xml_link_info="adc12_max_freq_dma_linkInfo.xml" -Wl,--rom_model -o "adc12_max_freq_dma.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: "$@"'
 	@echo ' '
 

@@ -1,12 +1,12 @@
 [
    {
-      "directory" : "C:/Users/Asus/workspace_ccstheia/uart_rw_multibyte_fifo_poll/Debug",
-      "command"   : "clang++ -D__MSPM0G3507__ -D__USE_SYSCONFIG__ -I\"C:/Users/Asus/workspace_ccstheia/uart_rw_multibyte_fifo_poll\" -I\"C:/Users/Asus/workspace_ccstheia/uart_rw_multibyte_fifo_poll/Debug\" -I\"C:/TI/mspm0_sdk_2_10_00_04/source/third_party/CMSIS/Core/Include\" -I\"C:/TI/mspm0_sdk_2_10_00_04/source\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/armv7em-ti-none-eabihf/c++/v1\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/c++/v1\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/lib/clang/22/include\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/c\" -xc",
-      "file"      : "C:/Users/Asus/workspace_ccstheia/uart_rw_multibyte_fifo_poll/uart_rw_multibyte_fifo_poll.c"
+      "directory" : "D:/Active-Filter-Module/Software/M0G3507_Code/uart_rw_multibyte_fifo_poll/Debug",
+      "command"   : "clang++ -D__MSPM0G3507__ -D__USE_SYSCONFIG__ -I\"D:/Active-Filter-Module/Software/M0G3507_Code/uart_rw_multibyte_fifo_poll\" -I\"D:/Active-Filter-Module/Software/M0G3507_Code/uart_rw_multibyte_fifo_poll/Debug\" -I\"C:/TI/mspm0_sdk_2_10_00_04/source/third_party/CMSIS/Core/Include\" -I\"C:/TI/mspm0_sdk_2_10_00_04/source\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/armv7em-ti-none-eabihf/c++/v1\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/c++/v1\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/lib/clang/22/include\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/c\" -xc",
+      "file"      : "D:/Active-Filter-Module/Software/M0G3507_Code/uart_rw_multibyte_fifo_poll/Debug/ti_msp_dl_config.c"
    },
    {
-      "directory" : "C:/Users/Asus/workspace_ccstheia/uart_rw_multibyte_fifo_poll/Debug",
-      "command"   : "clang++ -D__MSPM0G3507__ -D__USE_SYSCONFIG__ -I\"C:/Users/Asus/workspace_ccstheia/uart_rw_multibyte_fifo_poll\" -I\"C:/Users/Asus/workspace_ccstheia/uart_rw_multibyte_fifo_poll/Debug\" -I\"C:/TI/mspm0_sdk_2_10_00_04/source/third_party/CMSIS/Core/Include\" -I\"C:/TI/mspm0_sdk_2_10_00_04/source\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/armv7em-ti-none-eabihf/c++/v1\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/c++/v1\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/lib/clang/22/include\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/c\" -xc",
-      "file"      : "C:/Users/Asus/workspace_ccstheia/uart_rw_multibyte_fifo_poll/Debug/ti_msp_dl_config.c"
+      "directory" : "D:/Active-Filter-Module/Software/M0G3507_Code/uart_rw_multibyte_fifo_poll/Debug",
+      "command"   : "clang++ -D__MSPM0G3507__ -D__USE_SYSCONFIG__ -I\"D:/Active-Filter-Module/Software/M0G3507_Code/uart_rw_multibyte_fifo_poll\" -I\"D:/Active-Filter-Module/Software/M0G3507_Code/uart_rw_multibyte_fifo_poll/Debug\" -I\"C:/TI/mspm0_sdk_2_10_00_04/source/third_party/CMSIS/Core/Include\" -I\"C:/TI/mspm0_sdk_2_10_00_04/source\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/armv7em-ti-none-eabihf/c++/v1\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/c++/v1\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/lib/clang/22/include\" -isystem\"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/c\" -xc",
+      "file"      : "D:/Active-Filter-Module/Software/M0G3507_Code/uart_rw_multibyte_fifo_poll/uart_rw_multibyte_fifo_poll.c"
    }
 ]

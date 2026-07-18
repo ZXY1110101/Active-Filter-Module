@@ -22,5 +22,7 @@ float Frequency_GetDuty(void);
 FrequencyMode Frequency_GetMode(void);
 
 extern volatile uint32_t frequencyHz;
+extern volatile uint32_t frequencyCaptureIrqCount;
+extern volatile uint32_t frequencyLastPeriodTicks;
 
 #endif

@@ -36,6 +36,7 @@ extern "C" {
 
 typedef struct {
     int32_t vpp_mv;
+    int32_t amplitude_mv;
     int32_t vmax_mv;
     int32_t vmin_mv;
     int32_t vavg_mv;

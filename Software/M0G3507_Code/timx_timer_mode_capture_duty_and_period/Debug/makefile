@@ -129,7 +129,7 @@ all: $(OBJS) $(GEN_CMDS)
 # Tool invocations
 timx_timer_mode_capture_duty_and_period.out: $(OBJS) $(GEN_CMDS)
 	@echo 'Arm Linker - building target: "$@"'
-	"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/bin/tiarmclang.exe" @"device.opt"  -march=thumbv6m -mcpu=cortex-m0plus -mfloat-abi=soft -mlittle-endian -mthumb -O2 -gdwarf-3 -Wall -Wl,-m"timx_timer_mode_capture_duty_and_period.map" -Wl,-i"C:/TI/mspm0_sdk_2_10_00_04/source" -Wl,-i"C:/Users/Asus/workspace_ccstheia/timx_timer_mode_capture_duty_and_period" -Wl,-i"C:/Users/Asus/workspace_ccstheia/timx_timer_mode_capture_duty_and_period/Debug/syscfg" -Wl,-i"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/lib" -Wl,--diag_wrap=off -Wl,--display_error_number -Wl,--warn_sections -Wl,--xml_link_info="timx_timer_mode_capture_duty_and_period_linkInfo.xml" -Wl,--rom_model -o "timx_timer_mode_capture_duty_and_period.out" $(ORDERED_OBJS)
+	"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/bin/tiarmclang.exe" @"device.opt"  -march=thumbv6m -mcpu=cortex-m0plus -mfloat-abi=soft -mlittle-endian -mthumb -O2 -gdwarf-3 -Wall -Wl,-m"timx_timer_mode_capture_duty_and_period.map" -Wl,-i"C:/TI/mspm0_sdk_2_10_00_04/source" -Wl,-i"D:/Active-Filter-Module/Software/M0G3507_Code/timx_timer_mode_capture_duty_and_period" -Wl,-i"D:/Active-Filter-Module/Software/M0G3507_Code/timx_timer_mode_capture_duty_and_period/Debug/syscfg" -Wl,-i"D:/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/lib" -Wl,--diag_wrap=off -Wl,--display_error_number -Wl,--warn_sections -Wl,--xml_link_info="timx_timer_mode_capture_duty_and_period_linkInfo.xml" -Wl,--rom_model -o "timx_timer_mode_capture_duty_and_period.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: "$@"'
 	@echo ' '
 

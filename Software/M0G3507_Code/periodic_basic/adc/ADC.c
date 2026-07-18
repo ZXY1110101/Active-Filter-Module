@@ -9,6 +9,7 @@
 #define ADC_FULL_SCALE_CODE_U  (4095U)
 #define ADC_FULL_SCALE_CODE_F  (4095.0f)
 #define ADC_CLIP_MARGIN_CODE   (4U)
+#define ADC_CAPTURE_TIMEOUT_LOOPS (8000000U)
 
 /* 默认跟随 SysConfig 中 ADC MEM0 的参考电压配置。 */
 #ifndef ADC_REFERENCE_V
@@ -220,16 +221,28 @@ void ADC_StartFrame(void)
     DL_TimerG_startCounter(TIMER_0_INST);
 }
 
-void ADC_CaptureFrame(void)
+bool ADC_CaptureFrame(void)
 {
+    uint32_t timeout = ADC_CAPTURE_TIMEOUT_LOOPS;
+
     ADC_StartFrame();
 
-    while (!gADCFrameReady) {
-        __WFE();
+    while ((!gADCFrameReady) && (timeout > 0U)) {
+        timeout--;
+        __NOP();
     }
 
     DL_TimerG_stopCounter(TIMER_0_INST);
     DL_ADC12_stopConversion(ADC12_0_INST);
+
+    if (!gADCFrameReady) {
+        DL_DMA_disableChannel(DMA, DMA_CH0_CHAN_ID);
+        DL_DMA_clearInterruptStatus(DMA, DL_DMA_INTERRUPT_CHANNEL0);
+        NVIC_ClearPendingIRQ(DMA_INT_IRQn);
+        return false;
+    }
+
+    return true;
 }
 
 void DMA_IRQHandler(void)

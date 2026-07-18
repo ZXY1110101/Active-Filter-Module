@@ -32,7 +32,7 @@ extern ADC_Result adcResult;
 
 void ADC_Init(void);
 void ADC_StartFrame(void);
-void ADC_CaptureFrame(void);
+bool ADC_CaptureFrame(void);
 void ADC_AnalyzeSamples(void);
 
 #endif

@@ -48,7 +48,7 @@
 static void App_Init(void);
 static void App_RunMeasurementCycle(void);
 static void App_PrintBanner(void);
-static void App_PrintMeasurement(uint32_t frequencyHz);
+static void App_PrintMeasurement(uint32_t frequencyHz, bool adcFrameValid);
 static void App_UpdateDisplay(uint32_t frequencyHz);
 
 static int16_t gDisplaySamples[ADC_SAMPLE_SIZE];
@@ -85,12 +85,15 @@ static void App_Init(void)
 static void App_RunMeasurementCycle(void)
 {
     static uint32_t frameCount = 0U;
+    bool adcFrameValid;
 
     Frequency_Task();
     PGA_KeyScan();
 
-    ADC_CaptureFrame();
-    ADC_AnalyzeSamples();
+    adcFrameValid = ADC_CaptureFrame();
+    if (adcFrameValid) {
+        ADC_AnalyzeSamples();
+    }
 
     /*
      * TLV3507 基准使用跨帧中值、死区和分级低通跟踪。
@@ -98,7 +101,7 @@ static void App_RunMeasurementCycle(void)
      */
     DAC_TrackReference(
         adcResult.centerCode,
-        (!adcResult.clipped) &&
+        adcFrameValid && (!adcResult.clipped) &&
             ((uint16_t)(adcResult.maxCode - adcResult.minCode) >=
              DAC_MIN_VALID_VPP_CODE));
 
@@ -107,7 +110,8 @@ static void App_RunMeasurementCycle(void)
         uint32_t frequencyHz = Frequency_GetHz();
 
         frameCount = 0U;
-        App_PrintMeasurement(frequencyHz);
+
+        App_PrintMeasurement(frequencyHz, adcFrameValid);
         App_UpdateDisplay(frequencyHz);
     }
 
@@ -122,8 +126,25 @@ static void App_PrintBanner(void)
     UART_SendString("====================\r\n");
 }
 
-static void App_PrintMeasurement(uint32_t frequencyHz)
+static void App_PrintMeasurement(uint32_t frequencyHz, bool adcFrameValid)
 {
+    uint32_t sampleIndex;
+    uint32_t previousLevel =
+        (DL_GPIO_readPins(GPIO_CAPTURE_0_C0_PORT,
+                          GPIO_CAPTURE_0_C0_PIN) != 0U);
+    uint32_t pb13Level = previousLevel;
+    uint32_t rawEdges = 0U;
+
+    for (sampleIndex = 0U; sampleIndex < 500000U; sampleIndex++) {
+        pb13Level =
+            (DL_GPIO_readPins(GPIO_CAPTURE_0_C0_PORT,
+                              GPIO_CAPTURE_0_C0_PIN) != 0U);
+        if (pb13Level != previousLevel) {
+            rawEdges++;
+            previousLevel = pb13Level;
+        }
+    }
+
     UART_SendString("\r\n-------- DATA --------\r\n");
 
     UART_SendString("GAIN: ");
@@ -142,6 +163,10 @@ static void App_PrintMeasurement(uint32_t frequencyHz)
     UART_SendFloat(adcResult.vppV);
     UART_SendString(" V\r\n");
 
+    UART_SendString("AMP: ");
+    UART_SendFloat(adcResult.amplitudeV);
+    UART_SendString(" V\r\n");
+
     UART_SendString("RMS: ");
     UART_SendFloat(adcResult.rmsV);
     UART_SendString(" V\r\n");
@@ -157,8 +182,27 @@ static void App_PrintMeasurement(uint32_t frequencyHz)
     UART_SendFloat((float)frequencyHz);
     UART_SendString(" Hz\r\n");
 
+    UART_SendString("PB13_LEVEL: ");
+    UART_SendFloat((float)pb13Level);
+    UART_SendString("\r\n");
+
+    UART_SendString("GPIO_TRANSITIONS: ");
+    UART_SendFloat((float)rawEdges);
+    UART_SendString("\r\n");
+
+    UART_SendString("CAPTURE_IRQS: ");
+    UART_SendFloat((float)frequencyCaptureIrqCount);
+    UART_SendString("\r\n");
+
+    UART_SendString("PERIOD_TICKS: ");
+    UART_SendFloat((float)frequencyLastPeriodTicks);
+    UART_SendString("\r\n");
+
     if (adcResult.clipped) {
         UART_SendString("WARNING: ADC CLIPPED\r\n");
+    }
+    if (!adcFrameValid) {
+        UART_SendString("WARNING: ADC TIMEOUT\r\n");
     }
 
     UART_SendString("-----------------------\r\n");
@@ -188,8 +232,9 @@ static void App_UpdateDisplay(uint32_t frequencyHz)
     } else if (dutyPercent > 100.0f) {
         dutyPercent = 100.0f;
     }
-
     measurements.vpp_mv = (int32_t)(adcResult.vppV * 1000.0f + 0.5f);
+    measurements.amplitude_mv =
+        (int32_t)(adcResult.amplitudeV * 1000.0f + 0.5f);
     measurements.vmax_mv = (int32_t)(adcResult.maxV * 1000.0f + 0.5f);
     measurements.vmin_mv = (int32_t)(adcResult.minV * 1000.0f + 0.5f);
     measurements.vavg_mv =

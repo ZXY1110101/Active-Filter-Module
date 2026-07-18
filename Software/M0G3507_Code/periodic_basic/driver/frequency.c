@@ -22,6 +22,12 @@ typedef enum
     ACTIVE_MEASUREMENT_GATE
 } ActiveMeasurement;
 
+static const DL_TimerG_ClockConfig gEdgeCounterClockConfig = {
+    .clockSel = DL_TIMER_CLOCK_BUSCLK,
+    .divideRatio = DL_TIMER_CLOCK_DIVIDE_1,
+    .prescale = 0U,
+};
+
 static const DL_TimerG_CompareConfig gEdgeCounterConfig = {
     .compareMode = DL_TIMER_COMPARE_MODE_EDGE_COUNT,
     .count = EDGE_COUNTER_RELOAD - 1U,
@@ -43,6 +49,8 @@ static volatile uint64_t gPulseAccumulator = 0U;
 static volatile uint32_t gGateWindowCount = 0U;
 
 volatile uint32_t frequencyHz = 0U;
+volatile uint32_t frequencyCaptureIrqCount = 0U;
+volatile uint32_t frequencyLastPeriodTicks = 0U;
 static volatile float gPeriodUs = 0.0f;
 static volatile float gDutyPercent = 0.0f;
 
@@ -90,6 +98,12 @@ static void Frequency_ConfigurePeriodHardware(void)
 {
     Frequency_StopHardware();
 
+    DL_TimerG_reset(CAPTURE_0_INST);
+    DL_TimerG_enablePower(CAPTURE_0_INST);
+    delay_cycles(POWER_STARTUP_DELAY);
+    DL_GPIO_initPeripheralInputFunction(
+        GPIO_CAPTURE_0_C0_IOMUX, GPIO_CAPTURE_0_C0_IOMUX_FUNC);
+
     /* 恢复SysConfig生成的TIMG12联合捕获配置。 */
     SYSCFG_DL_CAPTURE_0_init();
     gCaptureLoadValue = DL_TimerG_getLoadValue(CAPTURE_0_INST);
@@ -109,6 +123,13 @@ static void Frequency_ConfigurePeriodHardware(void)
 static void Frequency_ConfigureGateHardware(void)
 {
     Frequency_StopHardware();
+
+    DL_TimerG_reset(CAPTURE_0_INST);
+    DL_TimerG_enablePower(CAPTURE_0_INST);
+    delay_cycles(POWER_STARTUP_DELAY);
+    DL_TimerG_setClockConfig(
+        CAPTURE_0_INST,
+        (DL_TimerG_ClockConfig *)&gEdgeCounterClockConfig);
 
     /* 同一个TIMG12/PB13动态切换为32位外部上升沿计数器。 */
     DL_TimerG_disableInterrupt(
@@ -165,6 +186,8 @@ void Frequency_StartPeriod(void)
     gCurrentMode = FREQUENCY_MODE_PERIOD;
     gRequestedMeasurement = ACTIVE_MEASUREMENT_PERIOD;
     frequencyHz = 0U;
+    frequencyCaptureIrqCount = 0U;
+    frequencyLastPeriodTicks = 0U;
     Frequency_ResetPeriodState();
     Frequency_ResetGateState();
     Frequency_ConfigurePeriodHardware();
@@ -245,11 +268,19 @@ void CAPTURE_0_INST_IRQHandler(void)
             {
                 break;
             }
+            frequencyCaptureIrqCount++;
 
             capturePeriod = DL_TimerG_getCaptureCompareValue(
                 CAPTURE_0_INST, DL_TIMER_CC_1_INDEX);
             captureHigh = DL_TimerG_getCaptureCompareValue(
                 CAPTURE_0_INST, DL_TIMER_CC_0_INDEX);
+
+            /*
+             * Combined capture requires a manual reload for TIMER_ERR_01.
+             * Reload immediately after latching both capture registers so the
+             * next measurement window starts as close to this edge as possible.
+             */
+            DL_TimerG_setTimerCount(CAPTURE_0_INST, gCaptureLoadValue);
 
             if (!gPeriodSynced)
             {
@@ -259,6 +290,7 @@ void CAPTURE_0_INST_IRQHandler(void)
             {
                 periodTicks = gCaptureLoadValue - capturePeriod;
                 highTicks = gCaptureLoadValue - captureHigh;
+                frequencyLastPeriodTicks = periodTicks;
 
                 if ((periodTicks > 0U) && (highTicks <= periodTicks))
                 {
@@ -302,8 +334,6 @@ void CAPTURE_0_INST_IRQHandler(void)
                 }
             }
 
-            DL_TimerG_setTimerCount(
-                CAPTURE_0_INST, gCaptureLoadValue);
             break;
         }
 
