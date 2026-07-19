@@ -174,12 +174,12 @@ static void make_frequency(char *buf, size_t len, uint32_t cHz)
     char *end = buf + len - 1U;
 
     if (cHz >= 100000000U) {
-        append_fixed(&p, end, (int32_t)(cHz / 10000U), 2U);
+        append_fixed(&p, end, (int32_t)(cHz / 1000000U), 2U);
         append_char(&p, end, 'M');
         append_char(&p, end, 'H');
         append_char(&p, end, 'Z');
     } else if (cHz >= 100000U) {
-        append_fixed(&p, end, (int32_t)(cHz / 10U), 2U);
+        append_fixed(&p, end, (int32_t)(cHz / 1000U), 2U);
         append_char(&p, end, 'K');
         append_char(&p, end, 'H');
         append_char(&p, end, 'Z');
