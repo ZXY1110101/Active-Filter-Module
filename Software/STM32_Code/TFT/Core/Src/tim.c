@@ -102,7 +102,11 @@ void MX_TIM5_Init(void)
   {
     Error_Handler();
   }
-  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_RESET;
+  /*
+   * PA1/TIM5_CH2作为TIM5外部计数时钟。
+   * 每个上升沿由硬件让TIM5计数器加1，不产生中断。
+   */
+  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_EXTERNAL1;
   sSlaveConfig.InputTrigger = TIM_TS_TI2FP2;
   sSlaveConfig.TriggerPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
   sSlaveConfig.TriggerFilter = 0;

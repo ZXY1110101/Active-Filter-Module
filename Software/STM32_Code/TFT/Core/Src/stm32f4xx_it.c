@@ -22,6 +22,7 @@
 #include "stm32f4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "signal_analyzer.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -198,6 +199,25 @@ void SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32f4xx.s).                    */
 /******************************************************************************/
+
+/**
+  * @brief This function handles EXTI line 1 interrupt.
+  */
+void EXTI1_IRQHandler(void)
+{
+    if (__HAL_GPIO_EXTI_GET_IT(GPIO_PIN_1) != RESET)
+    {
+        /*
+         * 先清除挂起标志，防止退出中断后立即再次进入。
+         */
+        __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_1);
+
+        /*
+         * 只处理等精度测频的起始或结束边沿。
+         */
+        signal_analyzer_frequency_edge_isr();
+    }
+}
 
 /**
   * @brief This function handles TIM5 global interrupt.

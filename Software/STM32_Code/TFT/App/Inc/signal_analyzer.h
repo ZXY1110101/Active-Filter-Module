@@ -29,6 +29,11 @@ typedef struct
     uint16_t spectrum[SIGNAL_SPECTRUM_BARS];
 } signal_analysis_t;
 
+/*
+ * PA1输入边沿中断调用，用于等精度测频闸门边界。
+ */
+void signal_analyzer_frequency_edge_isr(void);
+
 bool signal_analyzer_init(void);
 bool signal_analyzer_start(void);
 void signal_analyzer_process(void);

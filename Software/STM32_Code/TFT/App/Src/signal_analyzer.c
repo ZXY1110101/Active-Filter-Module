@@ -21,6 +21,9 @@
 #define MAX_FULL_PERIOD_COUNT        256U
 #define CAPTURE_TIMEOUT_MIN_MS       500U
 #define CAPTURE_TIMEOUT_PERIODS      3U
+#define EQUAL_GATE_TIME_MS           1000U
+#define EQUAL_EDGE_TIMEOUT_MS        2000U
+#define EQUAL_FREQUENCY_STALE_MS     3000U
 
 enum
 {
@@ -28,6 +31,15 @@ enum
     FRAME_READY,
     FRAME_READING
 };
+
+typedef enum
+{
+    EQUAL_STATE_IDLE = 0U,
+    EQUAL_STATE_WAIT_START,
+    EQUAL_STATE_RUNNING,
+    EQUAL_STATE_WAIT_STOP,
+    EQUAL_STATE_READY
+} equal_frequency_state_t;
 
 static uint16_t s_adc_dma[ADC_DMA_SAMPLE_COUNT] __attribute__((aligned(4)));
 static uint16_t s_frames[FRAME_SLOT_COUNT][SIGNAL_FFT_SIZE] __attribute__((aligned(4)));
@@ -52,6 +64,22 @@ static uint8_t s_fit_valid;
 static volatile uint32_t s_capture_period;
 static volatile uint32_t s_capture_high;
 static volatile uint32_t s_capture_tick_ms;
+
+/*
+ * 等精度测频状态。
+ */
+static volatile equal_frequency_state_t s_equal_state;
+
+static volatile uint32_t s_equal_input_start;
+static volatile uint32_t s_equal_input_stop;
+static volatile uint32_t s_equal_reference_start;
+static volatile uint32_t s_equal_reference_stop;
+
+static volatile uint32_t s_equal_gate_start_ms;
+static volatile uint32_t s_equal_stop_request_ms;
+
+static float32_t s_equal_frequency_hz;
+static uint32_t s_equal_frequency_tick_ms;
 
 static uint32_t analyzer_enter_critical(void)
 {
@@ -83,6 +111,207 @@ static uint32_t tim5_clock_hz(void)
     }
 
     return clock;
+}
+
+static void equal_frequency_exti_disable(void)
+{
+    /*
+     * 只关闭EXTI1中断屏蔽，不改变PA1/TIM5_CH2复用功能。
+     */
+    EXTI->IMR &= ~((uint32_t)GPIO_PIN_1);
+}
+
+static void equal_frequency_exti_arm(void)
+{
+    /*
+     * 清除可能残留的边沿标志，再开放下一次上升沿中断。
+     */
+    EXTI->PR = GPIO_PIN_1;
+    EXTI->IMR |= GPIO_PIN_1;
+}
+
+static bool equal_frequency_init(void)
+{
+    /*
+     * 开启Cortex-M4跟踪模块和DWT周期计数器。
+     * DWT CYCCNT按HCLK计数，本工程约为168MHz。
+     */
+    CoreDebug->DEMCR |=
+        CoreDebug_DEMCR_TRCENA_Msk;
+
+    DWT->CYCCNT = 0U;
+
+    DWT->CTRL |=
+        DWT_CTRL_CYCCNTENA_Msk;
+
+    if ((DWT->CTRL &
+         DWT_CTRL_CYCCNTENA_Msk) == 0U)
+    {
+        return false;
+    }
+
+    /*
+     * EXTI1选择GPIOA，即PA1。
+     * EXTI1映射位位于EXTICR[0]的[7:4]。
+     */
+    __HAL_RCC_SYSCFG_CLK_ENABLE();
+
+    SYSCFG->EXTICR[0] &=
+        ~((uint32_t)0x0FU << 4U);
+
+    /*
+     * 只检测上升沿。
+     */
+    EXTI->RTSR |= GPIO_PIN_1;
+    EXTI->FTSR &= ~((uint32_t)GPIO_PIN_1);
+
+    /*
+     * 初始化时保持EXTI关闭。
+     * 等精度状态机需要边沿时才临时开放。
+     */
+    equal_frequency_exti_disable();
+    EXTI->PR = GPIO_PIN_1;
+
+    /*
+     * EXTI1优先级高于ADC DMA，减少边沿时间戳抖动。
+     */
+    HAL_NVIC_SetPriority(EXTI1_IRQn, 0U, 0U);
+    HAL_NVIC_EnableIRQ(EXTI1_IRQn);
+
+    s_equal_state = EQUAL_STATE_IDLE;
+
+    s_equal_input_start = 0U;
+    s_equal_input_stop = 0U;
+    s_equal_reference_start = 0U;
+    s_equal_reference_stop = 0U;
+
+    s_equal_gate_start_ms = 0U;
+    s_equal_stop_request_ms = 0U;
+
+    s_equal_frequency_hz = 0.0f;
+    s_equal_frequency_tick_ms = 0U;
+
+    return true;
+}
+
+static bool equal_frequency_is_fresh(uint32_t now_ms)
+{
+    if (s_equal_frequency_hz <= 0.0f)
+    {
+        return false;
+    }
+
+    return ((now_ms -
+             s_equal_frequency_tick_ms) <
+            EQUAL_FREQUENCY_STALE_MS);
+}
+
+static void equal_frequency_process(void)
+{
+    uint32_t now_ms = HAL_GetTick();
+
+    if (s_equal_state == EQUAL_STATE_IDLE)
+    {
+        /*
+         * 开放EXTI，等待下一个输入上升沿作为测量起点。
+         */
+        s_equal_state = EQUAL_STATE_WAIT_START;
+        __DMB();
+
+        equal_frequency_exti_arm();
+        return;
+    }
+
+    if (s_equal_state == EQUAL_STATE_RUNNING)
+    {
+        /*
+         * 从真实输入起始边沿开始，等待约1秒。
+         */
+        if ((now_ms - s_equal_gate_start_ms) >=
+            EQUAL_GATE_TIME_MS)
+        {
+            /*
+             * 下一输入上升沿作为测量终点。
+             */
+            s_equal_stop_request_ms = now_ms;
+            s_equal_state = EQUAL_STATE_WAIT_STOP;
+            __DMB();
+
+            equal_frequency_exti_arm();
+        }
+
+        return;
+    }
+
+    if (s_equal_state == EQUAL_STATE_WAIT_STOP)
+    {
+        /*
+         * 请求结束后长时间没有输入边沿，说明输入可能消失。
+         */
+        if ((now_ms - s_equal_stop_request_ms) >=
+            EQUAL_EDGE_TIMEOUT_MS)
+        {
+            equal_frequency_exti_disable();
+
+            s_equal_frequency_hz = 0.0f;
+            s_equal_frequency_tick_ms = now_ms;
+
+            s_equal_state = EQUAL_STATE_IDLE;
+            __DMB();
+        }
+
+        return;
+    }
+
+    if (s_equal_state == EQUAL_STATE_READY)
+    {
+        uint32_t input_count;
+        uint32_t reference_count;
+
+        /*
+         * uint32_t无符号减法可自动处理计数器溢出。
+         *
+         * 1秒内：
+         * DWT 约计数168000000，不会超过32位。
+         */
+        input_count =
+            s_equal_input_stop -
+            s_equal_input_start;
+
+        reference_count =
+            s_equal_reference_stop -
+            s_equal_reference_start;
+
+        if ((input_count > 0U) &&
+            (reference_count > 0U))
+        {
+            /*
+             * 等精度测频：
+             *
+             * Fx = Fref × Nx / Ns
+             *
+             * Fref：DWT参考时钟，即HCLK
+             * Nx：完整输入周期数
+             * Ns：同一闸门内的参考时钟计数
+             */
+            s_equal_frequency_hz =
+                ((float32_t)HAL_RCC_GetHCLKFreq() *
+                 (float32_t)input_count) /
+                (float32_t)reference_count;
+        }
+        else
+        {
+            s_equal_frequency_hz = 0.0f;
+        }
+
+        s_equal_frequency_tick_ms = now_ms;
+
+        /*
+         * 下一次主循环重新等待起始边沿。
+         */
+        s_equal_state = EQUAL_STATE_IDLE;
+        __DMB();
+    }
 }
 
 static bool capture_is_fresh(uint32_t period_ticks,
@@ -887,10 +1116,6 @@ static void analyze_frame(const uint16_t *samples, uint32_t sequence)
     float32_t square_sum = 0.0f;
     float32_t mean;
     float32_t volts_per_count = ADC_REFERENCE_VOLTAGE / ADC_FULL_SCALE_COUNTS;
-    uint32_t period;
-    uint32_t high;
-    uint32_t capture_tick;
-    uint32_t primask;
 
     for (index = 0U; index < SIGNAL_FFT_SIZE; ++index)
     {
@@ -924,24 +1149,12 @@ static void analyze_frame(const uint16_t *samples, uint32_t sequence)
     analyze_waveform(samples, mean);
 
 
-    primask = analyzer_enter_critical();
-    period = s_capture_period;
-    high = s_capture_high;
-    capture_tick = s_capture_tick_ms;
-    analyzer_exit_critical(primask);
-
-    if (capture_is_fresh(period,
-                         capture_tick,
-                         HAL_GetTick()))
+    if (equal_frequency_is_fresh(HAL_GetTick()))
     {
         s_result.capture_frequency_hz =
-            (float32_t)tim5_clock_hz() /
-            (float32_t)period;
+            s_equal_frequency_hz;
 
-        s_result.capture_duty_percent =
-            100.0f *
-            (float32_t)high /
-            (float32_t)period;
+        s_result.capture_duty_percent = 0.0f;
     }
     else
     {
@@ -997,6 +1210,11 @@ bool signal_analyzer_init(void)
         s_result.sample_rate_hz = s_sample_rate_hz;
 
         update_capture_irq_divider();
+
+        if (!equal_frequency_init())
+        {
+            return false;
+        }
     }
 
     for (index = 0U; index < SIGNAL_FFT_SIZE; ++index)
@@ -1021,20 +1239,24 @@ bool signal_analyzer_start(void)
         return false;
     }
 
-    if (HAL_TIM_IC_Start_IT(&htim5, TIM_CHANNEL_1) != HAL_OK)
+    /*
+     * TIM5使用TI2外部时钟模式，只启动CH2，不开启中断。
+     */
+    __HAL_TIM_SET_COUNTER(&htim5, 0U);
+
+    if (HAL_TIM_IC_Start(&htim5,
+                         TIM_CHANNEL_2) != HAL_OK)
     {
         return false;
     }
-    if (HAL_TIM_IC_Start_IT(&htim5, TIM_CHANNEL_2) != HAL_OK)
-    {
-        return false;
-    }
+
     if (HAL_TIM_Base_Start(&htim2) != HAL_OK)
     {
         return false;
     }
 
     return true;
+
 }
 
 void signal_analyzer_process(void)
@@ -1045,6 +1267,14 @@ void signal_analyzer_process(void)
      * 每次主循环都检查，但函数内部限制为最多每秒调整一次。
      * 放在取帧之前，这样低采样率、暂时没有完整帧时，
      * 仍然可以根据TIM5频率重新调整采样率。
+     */
+    /*
+     * 等精度测频状态机。
+     */
+    equal_frequency_process();
+
+    /*
+     * 下一步再让自适应采样使用等精度频率。
      */
     update_adaptive_sample_rate();
 
@@ -1097,4 +1327,57 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
             s_capture_tick_ms = HAL_GetTick();
         }
     }
+}
+
+/*
+ * 等精度测频边沿入口。
+ * 下一步加入起始、结束计数锁存逻辑。
+ */
+void signal_analyzer_frequency_edge_isr(void)
+{
+    /*
+     * 先读取参考计数器，再读取输入计数器。
+     * 两次读取间只有很少的CPU周期。
+     */
+    uint32_t reference_count = DWT->CYCCNT;
+    uint32_t input_count =
+        __HAL_TIM_GET_COUNTER(&htim5);
+
+    if (s_equal_state == EQUAL_STATE_WAIT_START)
+    {
+        /*
+         * 第一个输入上升沿：同时锁存输入计数和参考计数。
+         */
+        s_equal_reference_start = reference_count;
+        s_equal_input_start = input_count;
+        s_equal_gate_start_ms = HAL_GetTick();
+
+        s_equal_state = EQUAL_STATE_RUNNING;
+
+        /*
+         * 测量窗口中关闭EXTI，高频输入不会产生中断。
+         */
+        equal_frequency_exti_disable();
+    }
+    else if (s_equal_state == EQUAL_STATE_WAIT_STOP)
+    {
+        /*
+         * 约1秒后的第一个输入上升沿：锁存终点。
+         */
+        s_equal_reference_stop = reference_count;
+        s_equal_input_stop = input_count;
+
+        s_equal_state = EQUAL_STATE_READY;
+
+        equal_frequency_exti_disable();
+    }
+    else
+    {
+        /*
+         * 非预期边沿直接关闭EXTI。
+         */
+        equal_frequency_exti_disable();
+    }
+
+    __DMB();
 }
