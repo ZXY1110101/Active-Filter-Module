@@ -80,9 +80,9 @@ void SystemClock_Config(void)
                        RCC_CLOCKTYPE_PCLK1 |
                        RCC_CLOCKTYPE_PCLK2;
     clocks.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-    clocks.AHBCLKDivider = RCC_SYSCLK_DIV1;
-    clocks.APB1CLKDivider = RCC_HCLK_DIV4;
-    clocks.APB2CLKDivider = RCC_HCLK_DIV2;
+    clocks.AHBCLKDivider = RCC_SYSCLK_DIV2;
+    clocks.APB1CLKDivider = RCC_HCLK_DIV2;
+    clocks.APB2CLKDivider = RCC_HCLK_DIV1;
 
     if (HAL_RCC_ClockConfig(&clocks, FLASH_LATENCY_5) != HAL_OK)
     {

@@ -57,6 +57,7 @@ static float32_t s_fft_output[SIGNAL_FFT_SIZE];
 static float32_t s_magnitude[SIGNAL_FFT_SIZE / 2U];
 static float32_t s_sample_rate_hz;
 static uint32_t s_last_sample_rate_update_ms;
+static uint32_t s_last_sample_rate_frequency_tick_ms;
 static signal_analysis_t s_result;
 static uint32_t s_last_fit_ms;
 static uint8_t s_fit_valid;
@@ -571,17 +572,16 @@ static bool set_tim2_sample_ticks(uint32_t sample_ticks)
 static void update_adaptive_sample_rate(void)
 {
     uint32_t now_ms = HAL_GetTick();
-    uint32_t capture_period;
-    uint32_t capture_tick;
+    uint32_t frequency_tick_ms;
     uint32_t timer_clock;
     uint32_t cycles;
     uint32_t minimum_sample_ticks;
     uint32_t desired_sample_ticks;
     uint32_t current_sample_ticks;
     uint32_t difference;
-    uint32_t primask;
-    uint64_t scaled_ticks;
     float32_t frequency_hz;
+    float32_t desired_sample_rate_hz;
+    float32_t desired_sample_ticks_f;
 
     /*
      * 最多每秒调整一次采样率。
@@ -592,84 +592,147 @@ static void update_adaptive_sample_rate(void)
         return;
     }
 
+    /*
+     * 每个新的等精度测频结果只处理一次。
+     * 避免主循环反复停止、启动ADC DMA。
+     */
+    frequency_tick_ms = s_equal_frequency_tick_ms;
+
+    if ((frequency_tick_ms == 0U) ||
+        (frequency_tick_ms ==
+         s_last_sample_rate_frequency_tick_ms))
+    {
+        return;
+    }
+
+    /*
+     * 先消费这次结果。即使重配置失败，也等待下一次
+     * 等精度测频结果，防止不断重试造成卡死。
+     */
+    s_last_sample_rate_frequency_tick_ms =
+        frequency_tick_ms;
+
     s_last_sample_rate_update_ms = now_ms;
 
     /*
-     * 原子读取TIM5输入捕获结果。
+     * 无效或已经过期的测频结果不改变当前采样率。
      */
-    primask = analyzer_enter_critical();
+    if (!equal_frequency_is_fresh(now_ms))
+    {
+        return;
+    }
 
-    capture_period = s_capture_period;
-    capture_tick = s_capture_tick_ms;
+    frequency_hz = s_equal_frequency_hz;
 
-    analyzer_exit_critical(primask);
-
-    /*
-     * 没有有效TIM5频率时保持当前采样率不变。
-     */
-    if (!capture_is_fresh(capture_period,
-                          capture_tick,
-                          now_ms))
+    if (frequency_hz <= 0.0f)
     {
         return;
     }
 
     timer_clock = tim5_clock_hz();
 
-    frequency_hz =
-        (float32_t)timer_clock /
-        (float32_t)capture_period;
+    if (timer_clock == 0U)
+    {
+        return;
+    }
 
+    /*
+     * 选择一帧包含的完整周期数：
+     * 低频周期少，避免一帧时间太长；
+     * 高频周期多，避免采样率超过1MHz。
+     */
     cycles = select_cycles_per_frame(frequency_hz);
 
+    if (cycles == 0U)
+    {
+        return;
+    }
+
     /*
-     * TIM2和TIM5共用APB1定时器时钟。
+     * 让1024点尽量包含整数个输入周期：
      *
-     * TIM5周期计数 = timer_clock / 输入频率
-     *
-     * 为了让1024点包含整数个周期：
-     *
-     * sample_ticks =
-     *     TIM5周期计数 × 完整周期数 / 1024
+     * Fs = 1024 × 输入频率 / 周期数
      */
-    scaled_ticks =
-        (uint64_t)capture_period *
-        (uint64_t)cycles +
-        (uint64_t)SIGNAL_FFT_SIZE / 2U;
-
-    scaled_ticks /= (uint64_t)SIGNAL_FFT_SIZE;
+    desired_sample_rate_hz =
+        ((float32_t)SIGNAL_FFT_SIZE *
+         frequency_hz) /
+        (float32_t)cycles;
 
     /*
-     * 限制最高采样率为1MHz。
+     * ADC最高采样率限制为1MHz。
+     */
+    if (desired_sample_rate_hz >
+        MAX_SAMPLE_RATE_HZ)
+    {
+        desired_sample_rate_hz =
+            MAX_SAMPLE_RATE_HZ;
+    }
+
+    if (desired_sample_rate_hz <= 0.0f)
+    {
+        return;
+    }
+
+    /*
+     * TIM2每个采样触发所需的定时器计数：
+     *
+     * ticks = TIM2时钟 / Fs
+     */
+    desired_sample_ticks_f =
+        (float32_t)timer_clock /
+        desired_sample_rate_hz;
+
+    /*
+     * 确保不超过1MHz，并至少保留两个TIM2时钟周期。
      */
     minimum_sample_ticks =
         (uint32_t)ceilf(
             (float32_t)timer_clock /
             MAX_SAMPLE_RATE_HZ);
 
-    if (scaled_ticks < (uint64_t)minimum_sample_ticks)
+    if (minimum_sample_ticks < 2U)
     {
-        scaled_ticks = minimum_sample_ticks;
+        minimum_sample_ticks = 2U;
     }
 
-    if (scaled_ticks > UINT32_MAX)
+    if (desired_sample_ticks_f >=
+        (float32_t)UINT32_MAX)
     {
-        scaled_ticks = UINT32_MAX;
+        desired_sample_ticks = UINT32_MAX;
+    }
+    else
+    {
+        desired_sample_ticks =
+            (uint32_t)(
+                desired_sample_ticks_f +
+                0.5f);
     }
 
-    desired_sample_ticks = (uint32_t)scaled_ticks;
+    if (desired_sample_ticks <
+        minimum_sample_ticks)
+    {
+        desired_sample_ticks =
+            minimum_sample_ticks;
+    }
 
     current_sample_ticks =
-        __HAL_TIM_GET_AUTORELOAD(&htim2) + 1U;
-
-    difference =
-        (desired_sample_ticks > current_sample_ticks) ?
-        (desired_sample_ticks - current_sample_ticks) :
-        (current_sample_ticks - desired_sample_ticks);
+        __HAL_TIM_GET_AUTORELOAD(&htim2) +
+        1U;
 
     /*
-     * 变化不到2%时不调整，避免TIM5测量抖动导致
-     * TIM2采样率不断重配。
+     * 计算新旧ARR差值。
+     */
+    difference =
+        (desired_sample_ticks >
+         current_sample_ticks) ?
+        (desired_sample_ticks -
+         current_sample_ticks) :
+        (current_sample_ticks -
+         desired_sample_ticks);
+
+    /*
+     * 变化不到2%时不重配置，避免测频微小抖动造成
+     * ADC DMA频繁停止和重启。
      */
     if ((float32_t)difference <
         SAMPLE_RATE_HYSTERESIS_RATIO *
@@ -678,7 +741,17 @@ static void update_adaptive_sample_rate(void)
         return;
     }
 
-    (void)set_tim2_sample_ticks(desired_sample_ticks);
+    /*
+     * set_tim2_sample_ticks()负责：
+     * 1. 停止TIM2；
+     * 2. 停止ADC DMA；
+     * 3. 清除旧帧；
+     * 4. 修改ARR；
+     * 5. 重新启动DMA和TIM2；
+     * 6. 更新s_sample_rate_hz。
+     */
+    (void)set_tim2_sample_ticks(
+        desired_sample_ticks);
 }
 
 static void capture_queue_half(const uint16_t *source)
@@ -1036,6 +1109,9 @@ static void analyze_fft(const uint16_t *samples, float32_t mean,float32_t fit_fr
                 2.0f * s_result.fft_peak_amplitude_v;
 
             s_fit_valid = 1U;
+//            s_result.fft_peak_amplitude_v = 0.0f;
+//            s_result.peak_to_peak_v = 0.0f;
+//            s_fit_valid = 1U;
         }
     }
 
@@ -1183,6 +1259,7 @@ bool signal_analyzer_init(void)
     s_last_fit_ms = 0U;
     s_fit_valid = 0U;
     s_last_sample_rate_update_ms = 0U;
+    s_last_sample_rate_frequency_tick_ms = 0U;
 
     /*
      * TIM2更新事件触发ADC采样。
