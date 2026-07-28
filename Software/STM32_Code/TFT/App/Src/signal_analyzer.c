@@ -1341,7 +1341,9 @@ void signal_analyzer_frequency_edge_isr(void)
      */
     uint32_t reference_count = DWT->CYCCNT;
     uint32_t input_count =
-        __HAL_TIM_GET_COUNTER(&htim5);
+        HAL_TIM_ReadCapturedValue(
+            &htim5,
+            TIM_CHANNEL_2);
 
     if (s_equal_state == EQUAL_STATE_WAIT_START)
     {
